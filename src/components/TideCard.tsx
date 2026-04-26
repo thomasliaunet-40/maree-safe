@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { TideData } from '../types';
 import { COLORS } from '../constants/colors';
 import { formatTime, coefficientLabel } from '../utils/tideCalculator';
-import TideChart from './TideChart';
 
 interface Props {
   data: TideData;
@@ -67,8 +66,6 @@ export default function TideCard({ data, isToday }: Props) {
         ))}
       </View>
 
-      {/* Graphique */}
-      {points.length > 0 && <TideChart points={points} isToday={isToday} />}
     </View>
   );
 }

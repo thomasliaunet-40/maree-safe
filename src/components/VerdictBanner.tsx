@@ -1,38 +1,28 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { VerdictResult, VerdictLevel } from '../types';
+import { VerdictResult, VerdictLevel, HourlyWeather } from '../types';
+import { TidePoint } from '../types';
 import { COLORS } from '../constants/colors';
+import TideChartVertical from './TideChartVertical';
 
 interface Props {
   verdict: VerdictResult;
+  tidePoints: TidePoint[];
+  hourlyWeather: HourlyWeather[];
+  isToday: boolean;
 }
 
 const CONFIG: Record<
   VerdictLevel,
   { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string; border: string }
 > = {
-  green: {
-    icon: 'checkmark-circle',
-    color: COLORS.green,
-    bg: COLORS.greenBg,
-    border: COLORS.greenBorder,
-  },
-  orange: {
-    icon: 'warning',
-    color: COLORS.orange,
-    bg: COLORS.orangeBg,
-    border: COLORS.orangeBorder,
-  },
-  red: {
-    icon: 'close-circle',
-    color: COLORS.red,
-    bg: COLORS.redBg,
-    border: COLORS.redBorder,
-  },
+  green:  { icon: 'checkmark-circle', color: COLORS.green,  bg: COLORS.greenBg,  border: COLORS.greenBorder },
+  orange: { icon: 'warning',          color: COLORS.orange, bg: COLORS.orangeBg, border: COLORS.orangeBorder },
+  red:    { icon: 'close-circle',     color: COLORS.red,    bg: COLORS.redBg,    border: COLORS.redBorder },
 };
 
-export default function VerdictBanner({ verdict }: Props) {
+export default function VerdictBanner({ verdict, tidePoints, hourlyWeather, isToday }: Props) {
   const { color, bg, border, icon } = CONFIG[verdict.level];
 
   return (
@@ -43,27 +33,34 @@ export default function VerdictBanner({ verdict }: Props) {
         <Text style={styles.sectionLabelText}>L'avis de MaréeSafe</Text>
       </View>
 
-      {/* Header */}
+      {/* Verdict principal */}
       <View style={styles.header}>
-        <Ionicons name={icon} size={32} color={color} />
+        <Ionicons name={icon} size={28} color={color} />
         <View style={styles.titles}>
           <Text style={[styles.title, { color }]}>{verdict.title}</Text>
           <Text style={styles.subtitle}>{verdict.subtitle}</Text>
         </View>
       </View>
 
+      {/* Graphique vertical marée + couleurs météo */}
+      {tidePoints.length > 0 && (
+        <TideChartVertical
+          points={tidePoints}
+          hourlyWeather={hourlyWeather}
+          isToday={isToday}
+        />
+      )}
+
       {/* Raisons */}
       {verdict.reasons.length > 0 && (
         <View style={styles.reasons}>
           {verdict.reasons.map((reason, i) => (
-            <Text key={i} style={styles.reason}>
-              • {reason}
-            </Text>
+            <Text key={i} style={styles.reason}>• {reason}</Text>
           ))}
         </View>
       )}
 
-      {/* Plage horaire recommandée */}
+      {/* Plage recommandée */}
       {verdict.recommendedWindow && (
         <View style={[styles.window, { borderTopColor: border }]}>
           <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
@@ -110,6 +107,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 4,
   },
   titles: {
     flex: 1,
@@ -125,7 +123,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   reasons: {
-    marginTop: 10,
+    marginTop: 12,
     gap: 3,
   },
   reason: {

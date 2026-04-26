@@ -196,13 +196,21 @@ export default function HomeScreen() {
           </View>
         ) : (
           <>
-            {/* Marées */}
-            {tideData && <TideCard data={tideData} isToday={isToday} />}
-            {tideError && (
-              <ErrorCard
-                message={tideError}
-                icon="water-outline"
-                onRetry={() => loadData(selectedPort, apiKey, selectedDate)}
+            {/* Avis MaréeSafe + graphique vertical */}
+            {verdict && (
+              <VerdictBanner
+                verdict={verdict}
+                tidePoints={tideData?.points ?? []}
+                hourlyWeather={
+                  weatherData?.hourly.filter(h =>
+                    h.time.startsWith(
+                      `${selectedDate.getFullYear()}-` +
+                      `${String(selectedDate.getMonth() + 1).padStart(2, '0')}-` +
+                      `${String(selectedDate.getDate()).padStart(2, '0')}`
+                    )
+                  ) ?? []
+                }
+                isToday={isToday}
               />
             )}
 
@@ -216,8 +224,15 @@ export default function HomeScreen() {
               />
             )}
 
-            {/* Avis MaréeSafe */}
-            {verdict && <VerdictBanner verdict={verdict} />}
+            {/* Marées — horaires PM/BM + coefficient */}
+            {tideData && <TideCard data={tideData} isToday={isToday} />}
+            {tideError && (
+              <ErrorCard
+                message={tideError}
+                icon="water-outline"
+                onRetry={() => loadData(selectedPort, apiKey, selectedDate)}
+              />
+            )}
           </>
         )}
 

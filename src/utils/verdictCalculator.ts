@@ -8,7 +8,7 @@ interface ConditionLevel {
   overall: VerdictLevel;
 }
 
-function assessConditions(windSpeed: number, windGust: number, waveHeight: number): ConditionLevel {
+export function assessConditions(windSpeed: number, windGust: number, waveHeight: number): ConditionLevel {
   const wind: VerdictLevel = windSpeed > 25 ? 'red' : windSpeed > 15 ? 'orange' : 'green';
   const gust: VerdictLevel = windGust > 32 ? 'red' : windGust > 22 ? 'orange' : 'green';
   const wave: VerdictLevel = waveHeight > 2.5 ? 'red' : waveHeight > 1.5 ? 'orange' : 'green';

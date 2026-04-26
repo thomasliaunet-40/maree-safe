@@ -12,14 +12,14 @@ export async function fetchWeatherData(port: Port): Promise<WeatherData> {
     `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
     `&wind_speed_unit=kn` +
     `&timezone=Europe%2FParis` +
-    `&forecast_days=1`;
+    `&forecast_days=9`;
 
   const marineUrl =
     `${MARINE_URL}?latitude=${lat}&longitude=${lng}` +
     `&current=wave_height,wave_direction` +
     `&hourly=wave_height,wave_direction` +
     `&timezone=Europe%2FParis` +
-    `&forecast_days=1`;
+    `&forecast_days=9`;
 
   const [windResp, marineResp] = await Promise.allSettled([
     fetch(windUrl).then(r => r.json()),
