@@ -11,7 +11,7 @@ interface Props {
   isToday: boolean;
 }
 
-const CHART_H = 288;       // hauteur du graphique en px
+const CHART_H = 480;       // hauteur du graphique en px
 const Y_LABEL_W = 28;      // largeur colonne heures
 const PADDING_RIGHT = 4;
 
