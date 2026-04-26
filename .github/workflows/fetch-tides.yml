@@ -1,0 +1,32 @@
+name: Mise à jour données marées
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # Tous les jours à 3h UTC (5h heure de Paris en été)
+  workflow_dispatch:      # Déclenchement manuel possible depuis GitHub
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Récupérer les données de marée
+        run: node scripts/fetchTides.js
+
+      - name: Commit et push des données mises à jour
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/tides/
+          git diff --staged --quiet || (
+            git commit -m "chore: mise à jour marées $(date +%Y-%m-%d)" &&
+            git push
+          )
