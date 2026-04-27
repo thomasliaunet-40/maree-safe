@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { WeatherData } from '../types';
 import { COLORS } from '../constants/colors';
+import { FONTS } from '../constants/fonts';
 import { degreesToCompass, windArrow, beaufortScale } from '../utils/windDirection';
 
 interface Props {
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: COLORS.textPrimary,
     letterSpacing: 0.2,
     textTransform: 'uppercase',
@@ -148,11 +149,12 @@ const styles = StyleSheet.create({
   },
   windValue: {
     fontSize: 40,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     letterSpacing: -1,
   },
   windUnit: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
     marginTop: -2,
   },
@@ -167,17 +169,18 @@ const styles = StyleSheet.create({
   },
   windCompass: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: COLORS.textPrimary,
   },
   windBeaufort: {
     fontSize: 11,
     color: COLORS.primary,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     marginTop: 2,
   },
   windDesc: {
     fontSize: 10,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
     textAlign: 'center',
   },
@@ -187,19 +190,20 @@ const styles = StyleSheet.create({
   },
   waveValue: {
     fontSize: 40,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     letterSpacing: -1,
   },
   waveUnit: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
     marginTop: -2,
     textAlign: 'center',
   },
   waveDir: {
     fontSize: 11,
+    fontFamily: FONTS.semiBold,
     color: COLORS.primary,
-    fontWeight: '500',
     marginTop: 2,
   },
   details: {
@@ -215,6 +219,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 13,
+    fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
   },
   statRight: {
@@ -224,12 +229,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: COLORS.textPrimary,
   },
   statUnit: {
     fontSize: 12,
-    fontWeight: '400',
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
   },
   statDetail: {

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { TideData } from '../types';
 import { COLORS } from '../constants/colors';
+import { FONTS } from '../constants/fonts';
 import { formatTime, coefficientLabel } from '../utils/tideCalculator';
 
 interface Props {
@@ -97,7 +98,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: COLORS.textPrimary,
     letterSpacing: 0.2,
     textTransform: 'uppercase',
@@ -114,12 +115,13 @@ const styles = StyleSheet.create({
   },
   currentHeightValue: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     color: COLORS.textPrimary,
     letterSpacing: -0.5,
   },
   currentHeightLabel: {
     fontSize: 11,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
     marginTop: 1,
   },
@@ -140,11 +142,12 @@ const styles = StyleSheet.create({
   },
   coeffValue: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     letterSpacing: -0.5,
   },
   coeffLabel: {
     fontSize: 10,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
     marginTop: 1,
     textAlign: 'center',
@@ -165,17 +168,18 @@ const styles = StyleSheet.create({
   },
   peakLabel: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: FONTS.bold,
     letterSpacing: 0.5,
   },
   peakTime: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: FONTS.semiBold,
     color: COLORS.textPrimary,
     marginTop: 2,
   },
   peakHeight: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: COLORS.textSecondary,
     marginTop: 1,
   },

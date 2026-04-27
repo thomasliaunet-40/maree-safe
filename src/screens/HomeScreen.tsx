@@ -11,7 +11,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Port, TideData, WeatherData, VerdictResult } from '../types';
 import { COLORS } from '../constants/colors';
+import { FONTS } from '../constants/fonts';
 import { ALL_PORTS } from '../constants/ports';
+import AppLogo from '../components/AppLogo';
 import { fetchTideData } from '../services/tideService';
 import { fetchWeatherData } from '../services/weatherService';
 import { saveApiKey, loadApiKey, saveSelectedPortId, loadSelectedPortId } from '../services/storageService';
@@ -151,7 +153,16 @@ export default function HomeScreen() {
       {/* Header fixe */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.appName}>🌊 MaréeSafe</Text>
+          <View style={styles.logoRow}>
+            <AppLogo size={34} />
+            <View style={styles.logoText}>
+              <Text style={styles.appName}>
+                <Text style={styles.appNameMaree}>Marée</Text>
+                <Text style={styles.appNameSafe}> Safe</Text>
+              </Text>
+              <Text style={styles.appTagline}>La mer, en sécurité.</Text>
+            </View>
+          </View>
           <Text style={styles.date}>{displayDateFormatted}</Text>
         </View>
         <View style={styles.headerRight}>
@@ -316,16 +327,37 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  logoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoText: {
+    gap: 1,
+  },
   appName: {
     fontSize: 20,
-    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  appNameMaree: {
+    fontFamily: FONTS.semiBold,
     color: COLORS.textPrimary,
-    letterSpacing: -0.5,
+  },
+  appNameSafe: {
+    fontFamily: FONTS.bold,
+    color: COLORS.primary,
+  },
+  appTagline: {
+    fontSize: 10,
+    fontFamily: FONTS.regular,
+    color: COLORS.textSecondary,
+    letterSpacing: 0.3,
   },
   date: {
     fontSize: 12,
+    fontFamily: FONTS.regular,
     color: COLORS.textMuted,
-    marginTop: 2,
+    marginTop: 6,
   },
   headerRight: {
     flexDirection: 'row',

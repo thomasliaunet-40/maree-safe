@@ -1,13 +1,18 @@
 export const COLORS = {
-  background: '#0A1628',
-  surface: '#132040',
-  surface2: '#1A2D50',
-  border: '#243B5A',
-  borderLight: '#2D4A6E',
+  // Backgrounds (charte: #0D1B2A)
+  background: '#0D1B2A',
+  surface: '#132240',
+  surface2: '#1A2D52',
+  border: '#1E3A5F',
+  borderLight: '#2A4A6E',
 
-  primary: '#0EA5E9',
-  primaryLight: '#38BDF8',
-  primaryDark: '#0284C7',
+  // Primary teal (charte: #16B5B0)
+  primary: '#16B5B0',
+  primaryLight: '#ABE2E1',
+  primaryDark: '#0F8A86',
+
+  // Navy (charte: #1E3A5F)
+  navy: '#1E3A5F',
 
   green: '#22C55E',
   greenBg: 'rgba(34, 197, 94, 0.12)',
@@ -21,11 +26,11 @@ export const COLORS = {
   redBg: 'rgba(239, 68, 68, 0.12)',
   redBorder: 'rgba(239, 68, 68, 0.30)',
 
-  textPrimary: '#F8FAFC',
-  textSecondary: '#94A3B8',
-  textMuted: '#64748B',
+  textPrimary: '#F2F4F7',
+  textSecondary: '#ABE2E1',
+  textMuted: '#6B8CAE',
 
-  tidalBar: '#0EA5E9',
+  tidalBar: '#16B5B0',
   tidalBarCurrent: '#F59E0B',
   tidalBarLow: '#1E3A5F',
 } as const;
