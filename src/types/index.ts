@@ -50,19 +50,35 @@ export type VerdictLevel = 'green' | 'orange' | 'red';
 
 export interface VerdictResult {
   level: VerdictLevel;
+  score: number;           // 0–100
+  hourlyScores: number[];  // 24 valeurs pour la timeline
   title: string;
   subtitle: string;
   reasons: string[];
-  recommendedWindow: { start: string; end: string; level: VerdictLevel } | null;
+  recommendedWindow: { start: number; end: number } | null; // heures entières
 }
 
-export interface AppState {
-  selectedPort: Port | null;
-  tideData: TideData | null;
-  weatherData: WeatherData | null;
-  verdict: VerdictResult | null;
-  loading: boolean;
-  tideError: string | null;
-  weatherError: string | null;
-  apiKey: string;
+export interface BoatSettings {
+  type: 'derive' | 'voilier-quillard' | 'cata' | 'hauturier';
+  length: number;
+  draft: number;
+  experience: 'Débutant' | 'Confirmé' | 'Expert';
+  maxWind: number;
+  maxWaves: number;
 }
+
+export const BOAT_DEFAULT: BoatSettings = {
+  type: 'voilier-quillard',
+  length: 9.5,
+  draft: 1.8,
+  experience: 'Confirmé',
+  maxWind: 25,
+  maxWaves: 1.8,
+};
+
+export const BOAT_TYPES = [
+  { id: 'derive' as const,           label: 'Dériveur',          subtitle: 'Léger, rapide, sensible' },
+  { id: 'voilier-quillard' as const, label: 'Voilier quillard',  subtitle: 'Croisière côtière' },
+  { id: 'cata' as const,             label: 'Catamaran',          subtitle: 'Stable, vitesse élevée' },
+  { id: 'hauturier' as const,        label: 'Voilier hauturier',  subtitle: 'Croisière au large' },
+];

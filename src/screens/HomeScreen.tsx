@@ -1,487 +1,331 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Port, TideData, WeatherData, VerdictResult } from '../types';
+import React from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { TideData, WeatherData, VerdictResult, Port, BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
-import { ALL_PORTS } from '../constants/ports';
-import AppLogo from '../components/AppLogo';
-import { fetchTideData } from '../services/tideService';
-import { fetchWeatherData } from '../services/weatherService';
-import { saveApiKey, loadApiKey, saveSelectedPortId, loadSelectedPortId } from '../services/storageService';
-import { calculateVerdict } from '../utils/verdictCalculator';
-import VerdictBanner from '../components/VerdictBanner';
-import TideCard from '../components/TideCard';
-import WeatherCard from '../components/WeatherCard';
-import PortSelector from '../components/PortSelector';
-import ApiKeyModal from '../components/ApiKeyModal';
-import DateStrip from '../components/DateStrip';
+import { degreesToCompass } from '../utils/windDirection';
+import Icon from '../components/Icon';
+import FabNav, { Screen } from '../components/FabNav';
+import VerdictTimeline from '../components/VerdictTimeline';
+import Compass from '../components/Compass';
 
-const DEFAULT_PORT = ALL_PORTS.find(p => p.id === 'boucau-bayonne-biarritz')!;
-
-function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+interface Props {
+  port: Port;
+  tideData: TideData | null;
+  weatherData: WeatherData | null;
+  verdict: VerdictResult | null;
+  loading: boolean;
+  tideError: string | null;
+  weatherError: string | null;
+  boat: BoatSettings;
+  selectedDate: Date;
+  isToday: boolean;
+  onNav: (s: Screen) => void;
 }
 
-function formatDateFR(date: Date): string {
-  return date.toLocaleDateString('fr-FR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+function scoreColor(s: number) {
+  if (s >= 75) return { bg: COLORS.go,   ink: COLORS.goInk };
+  if (s >= 55) return { bg: '#d4edaa',   ink: '#3a5a1a' };
+  if (s >= 35) return { bg: COLORS.warn,  ink: '#7a3d18' };
+  return           { bg: COLORS.stop,     ink: '#fff' };
 }
 
-export default function HomeScreen() {
-  const [selectedPort, setSelectedPort] = useState<Port>(DEFAULT_PORT);
-  const [apiKey, setApiKey] = useState('');
-  const [tideData, setTideData] = useState<TideData | null>(null);
-  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-  const [verdict, setVerdict] = useState<VerdictResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [tideError, setTideError] = useState<string | null>(null);
-  const [weatherError, setWeatherError] = useState<string | null>(null);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date>(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
+export default function HomeScreen({
+  port, tideData, weatherData, verdict, loading, tideError, weatherError,
+  boat, selectedDate, isToday, onNav,
+}: Props) {
+  const hour = new Date().getHours();
+  const score = verdict?.score ?? 0;
+  const { bg, ink } = scoreColor(score);
+
+  const nextTide = (() => {
+    if (!tideData) return null;
+    const nowH = hour + new Date().getMinutes() / 60;
+    return tideData.peaks.find(p => {
+      const [h, m] = p.time.split('T')[1]?.split(':') ?? ['0', '0'];
+      return parseInt(h) + parseInt(m) / 60 > nowH;
+    }) ?? tideData.peaks[0] ?? null;
+  })();
+
+  const dateFmt = selectedDate.toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long',
   });
-
-  // Chargement des préférences sauvegardées
-  useEffect(() => {
-    (async () => {
-      const [savedKey, savedPortId] = await Promise.all([loadApiKey(), loadSelectedPortId()]);
-      if (savedKey) setApiKey(savedKey);
-      if (savedPortId) {
-        const port = ALL_PORTS.find(p => p.id === savedPortId);
-        if (port) setSelectedPort(port);
-      }
-      setInitialized(true);
-    })();
-  }, []);
-
-  const loadData = useCallback(
-    async (port: Port, key: string, date: Date, isRefresh = false) => {
-      if (isRefresh) setRefreshing(true);
-      else setLoading(true);
-      setTideError(null);
-      setWeatherError(null);
-
-      const [tideResult, weatherResult] = await Promise.allSettled([
-        fetchTideData(port, key, date),
-        fetchWeatherData(port),
-      ]);
-
-      let newTide: TideData | null = null;
-      let newWeather: WeatherData | null = null;
-
-      if (tideResult.status === 'fulfilled') {
-        newTide = tideResult.value;
-        setTideData(newTide);
-      } else {
-        const msg = (tideResult.reason as Error).message;
-        if (msg === 'CLÉ_API_INVALIDE') {
-          setTideError('Clé API invalide ou expirée');
-          setShowApiKeyModal(true);
-        } else {
-          setTideError(msg);
-        }
-      }
-
-      if (weatherResult.status === 'fulfilled') {
-        newWeather = weatherResult.value;
-        setWeatherData(newWeather);
-      } else {
-        setWeatherError((weatherResult.reason as Error).message);
-      }
-
-      if (newWeather) {
-        setVerdict(calculateVerdict(newWeather, newTide));
-      }
-
-      setLoading(false);
-      setRefreshing(false);
-    },
-    []
-  );
-
-  // Charger les données au démarrage, quand le port ou la date change
-  useEffect(() => {
-    if (initialized) {
-      loadData(selectedPort, apiKey, selectedDate);
-    }
-  }, [initialized, selectedPort, selectedDate]);
-
-  const handlePortChange = async (port: Port) => {
-    setSelectedPort(port);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    setSelectedDate(today);
-    await saveSelectedPortId(port.id);
-  };
-
-  const handleDateSelect = (date: Date) => {
-    setSelectedDate(date);
-  };
-
-  const handleApiKeySave = async (key: string) => {
-    setApiKey(key);
-    await saveApiKey(key);
-  };
-
-  const isToday = isSameDay(selectedDate, new Date());
-  const displayDate = formatDateFR(selectedDate);
-  const displayDateFormatted = displayDate.charAt(0).toUpperCase() + displayDate.slice(1);
+  const dateLabel = dateFmt.charAt(0).toUpperCase() + dateFmt.slice(1);
 
   return (
-    <View style={styles.root}>
-      {/* Header fixe */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.logoRow}>
-            <AppLogo size={34} />
-            <View style={styles.logoText}>
-              <Text style={styles.appName}>
-                <Text style={styles.appNameMaree}>Marée</Text>
-                <Text style={styles.appNameSafe}> Safe</Text>
-              </Text>
-              <Text style={styles.appTagline}>La mer, en sécurité.</Text>
-            </View>
-          </View>
-          <Text style={styles.date}>{displayDateFormatted}</Text>
-        </View>
-        <View style={styles.headerRight}>
-          <PortSelector selectedPort={selectedPort} onSelect={handlePortChange} />
-          <TouchableOpacity
-            style={styles.keyButton}
-            onPress={() => setShowApiKeyModal(true)}
-          >
-            <Ionicons
-              name="key-outline"
-              size={18}
-              color={apiKey ? COLORS.green : COLORS.textMuted}
-            />
-          </TouchableOpacity>
+    <View style={styles.screen}>
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.portBtn} onPress={() => onNav('ports')} activeOpacity={0.7}>
+          <Icon name="location" size={16} stroke={COLORS.ink2} />
+          <Text style={styles.portName}>{port.name}</Text>
+          <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
+        </TouchableOpacity>
+        <View style={styles.bellBtn}>
+          <Icon name="bell" size={18} stroke={COLORS.ink2} />
         </View>
       </View>
 
-      {/* Calendrier de sélection de date */}
-      <DateStrip
-        selectedDate={selectedDate}
-        onSelect={handleDateSelect}
-      />
-
-      {/* Contenu scrollable */}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => loadData(selectedPort, apiKey, selectedDate, true)}
-            tintColor={COLORS.primary}
-            colors={[COLORS.primary]}
-          />
-        }
         showsVerticalScrollIndicator={false}
       >
-        {loading && !tideData && !weatherData ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.primary} />
-            <Text style={styles.loadingText}>Récupération des données…</Text>
-          </View>
-        ) : (
-          <>
-            {/* Avis MaréeSafe + graphique vertical */}
-            {verdict && (
-              <VerdictBanner
-                verdict={verdict}
-                tidePoints={tideData?.points ?? []}
-                hourlyWeather={
-                  weatherData?.hourly.filter(h =>
-                    h.time.startsWith(
-                      `${selectedDate.getFullYear()}-` +
-                      `${String(selectedDate.getMonth() + 1).padStart(2, '0')}-` +
-                      `${String(selectedDate.getDate()).padStart(2, '0')}`
-                    )
-                  ) ?? []
-                }
-                isToday={isToday}
-              />
-            )}
-
-            {/* Météo marine */}
-            {weatherData && <WeatherCard data={weatherData} />}
-            {weatherError && (
-              <ErrorCard
-                message={weatherError}
-                icon="partly-sunny-outline"
-                onRetry={() => loadData(selectedPort, apiKey, selectedDate)}
-              />
-            )}
-
-            {/* Marées — horaires PM/BM + coefficient */}
-            {tideData && <TideCard data={tideData} isToday={isToday} />}
-            {tideError && (
-              <ErrorCard
-                message={tideError}
-                icon="water-outline"
-                onRetry={() => loadData(selectedPort, apiKey, selectedDate)}
-              />
-            )}
-          </>
-        )}
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Données marées : api-maree.fr · Météo : Open-Meteo
+        {/* Greeting */}
+        <View style={styles.greeting}>
+          <Text style={styles.greetingDate}>{dateLabel}</Text>
+          <Text style={styles.greetingTitle}>
+            {'Bonjour Marin,\n'}
+            <Text style={styles.greetingMuted}>la mer vous attend.</Text>
           </Text>
         </View>
+
+        {loading && !verdict ? (
+          <View style={styles.loading}>
+            <ActivityIndicator color={COLORS.brand} />
+            <Text style={styles.loadingText}>Chargement…</Text>
+          </View>
+        ) : verdict ? (
+          <>
+            {/* Verdict card */}
+            <TouchableOpacity
+              style={[styles.verdictCard, { backgroundColor: bg }]}
+              activeOpacity={0.95}
+            >
+              {/* Score badge */}
+              <View style={styles.scoreBadge}>
+                <View style={[styles.scoreDot, { backgroundColor: ink }]} />
+                <Text style={[styles.scoreTxt, { color: ink }]}>{score}/100</Text>
+              </View>
+
+              <Text style={[styles.verdictTime, { color: ink }]}>
+                {isToday ? `Maintenant · ${String(hour).padStart(2, '0')}:00` : dateLabel}
+              </Text>
+              <Text style={[styles.verdictTitle, { color: ink }]}>{verdict.title}</Text>
+              <Text style={[styles.verdictSub, { color: ink }]}>{verdict.subtitle}</Text>
+
+              {/* Timeline */}
+              <View style={{ marginTop: 16 }}>
+                <VerdictTimeline
+                  hourlyScores={verdict.hourlyScores}
+                  recommendedWindow={verdict.recommendedWindow}
+                  currentHour={isToday ? hour : 12}
+                />
+              </View>
+
+              {/* Fenêtre recommandée */}
+              {verdict.recommendedWindow && (
+                <View style={styles.windowRow}>
+                  <View style={styles.windowIcon}>
+                    <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.windowLabel, { color: ink }]}>Fenêtre recommandée</Text>
+                    <Text style={[styles.windowTime, { color: ink }]}>
+                      {verdict.recommendedWindow.start}h00 — {verdict.recommendedWindow.end}h00
+                      <Text style={{ fontFamily: FONTS.regular, opacity: 0.65 }}>
+                        {' '}· {verdict.recommendedWindow.end - verdict.recommendedWindow.start + 1}h
+                      </Text>
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* 3 KPI cards */}
+            {weatherData && (
+              <View style={styles.kpiRow}>
+                {/* Marée */}
+                <TouchableOpacity style={[styles.kpiCard, styles.kpiTide]} onPress={() => onNav('tide')} activeOpacity={0.85}>
+                  <View style={styles.kpiHeader}>
+                    <Icon name="wave" size={18} stroke={COLORS.tideInk} />
+                    <Text style={[styles.kpiTag, { color: COLORS.tideInk }]}>
+                      {nextTide?.type === 'high' ? 'Pleine mer' : 'Basse mer'}
+                    </Text>
+                  </View>
+                  <Text style={[styles.kpiValue, { color: COLORS.tideInk }]}>
+                    {nextTide?.height.toFixed(1) ?? '—'}
+                    <Text style={styles.kpiUnit}>m</Text>
+                  </Text>
+                  <Text style={[styles.kpiSub, { color: COLORS.tideInk }]}>
+                    {nextTide ? `à ${nextTide.time.split('T')[1]?.slice(0, 5)}` : ''}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Vent */}
+                <View style={[styles.kpiCard, styles.kpiSand]}>
+                  <View style={styles.kpiHeader}>
+                    <Icon name="wind" size={18} stroke={COLORS.sandInk} />
+                    <Text style={[styles.kpiTag, { color: COLORS.sandInk }]}>
+                      Vent {degreesToCompass(weatherData.windDirection)}
+                    </Text>
+                  </View>
+                  <Text style={[styles.kpiValue, { color: COLORS.sandInk }]}>
+                    {Math.round(weatherData.windSpeed)}
+                    <Text style={styles.kpiUnit}>kn</Text>
+                  </Text>
+                  <Text style={[styles.kpiSub, { color: COLORS.sandInk }]}>
+                    raf. {Math.round(weatherData.windGust)} kn
+                  </Text>
+                </View>
+
+                {/* Coef */}
+                <TouchableOpacity style={[styles.kpiCard, styles.kpiLilac]} onPress={() => onNav('tide')} activeOpacity={0.85}>
+                  <View style={styles.kpiHeader}>
+                    <Icon name="anchor" size={18} stroke={COLORS.lilacInk} />
+                    <Text style={[styles.kpiTag, { color: COLORS.lilacInk }]}>Coef.</Text>
+                  </View>
+                  <Text style={[styles.kpiValue, { color: COLORS.lilacInk }]}>
+                    {tideData?.coefficient ?? '—'}
+                  </Text>
+                  <Text style={[styles.kpiSub, { color: COLORS.lilacInk }]}>
+                    {(tideData?.coefficient ?? 0) >= 95 ? 'grandes vives-eaux'
+                      : (tideData?.coefficient ?? 0) >= 70 ? 'vives-eaux' : 'mortes-eaux'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {/* État de la mer */}
+            {weatherData && (
+              <View style={styles.seaCard}>
+                <View style={styles.seaTop}>
+                  <View>
+                    <Text style={styles.seaTag}>État de la mer</Text>
+                    <Text style={styles.seaLabel}>
+                      {weatherData.waveHeight > 2.5 ? 'Mer agitée'
+                        : weatherData.waveHeight > 1.5 ? 'Mer formée'
+                        : weatherData.waveHeight > 0.5 ? 'Belle mer'
+                        : 'Mer calme'}
+                    </Text>
+                  </View>
+                  <Compass deg={weatherData.windDirection} size={56} color="#fff" bg="rgba(255,255,255,0.12)" />
+                </View>
+                <View style={styles.seaGrid}>
+                  <View>
+                    <Text style={styles.seaStatLabel}>Vagues</Text>
+                    <Text style={styles.seaStatValue}>
+                      {weatherData.waveHeight.toFixed(1)}<Text style={styles.seaStatUnit}>m</Text>
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.seaStatLabel}>Rafales</Text>
+                    <Text style={styles.seaStatValue}>
+                      {Math.round(weatherData.windGust)}<Text style={styles.seaStatUnit}>kn</Text>
+                    </Text>
+                  </View>
+                  <View>
+                    <Text style={styles.seaStatLabel}>Direction</Text>
+                    <Text style={styles.seaStatValue}>
+                      {degreesToCompass(weatherData.windDirection)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {/* Action cards */}
+            <TouchableOpacity style={styles.planCard} onPress={() => onNav('week')} activeOpacity={0.85}>
+              <View style={styles.planIcon}>
+                <Icon name="calendar" size={20} stroke="#fff" strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.planTitle}>Planifier ma semaine</Text>
+                <Text style={styles.planSub}>Vue 7 jours · fenêtres détectées</Text>
+              </View>
+              <Icon name="chevronRight" size={18} stroke="rgba(255,255,255,0.5)" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.boatCard} onPress={() => onNav('boat')} activeOpacity={0.85}>
+              <View style={styles.boatIcon}>
+                <Icon name="boat" size={18} stroke={COLORS.ink2} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.boatTitle}>{boat.length} m · {
+                  boat.type === 'derive' ? 'Dériveur'
+                  : boat.type === 'voilier-quillard' ? 'Voilier quillard'
+                  : boat.type === 'cata' ? 'Catamaran' : 'Voilier hauturier'
+                }</Text>
+                <Text style={styles.boatSub}>Seuils : {boat.maxWind} kn · {boat.maxWaves} m</Text>
+              </View>
+              <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
+            </TouchableOpacity>
+
+            {/* Erreurs */}
+            {tideError && <Text style={styles.error}>{tideError}</Text>}
+            {weatherError && <Text style={styles.error}>{weatherError}</Text>}
+          </>
+        ) : null}
       </ScrollView>
 
-      <ApiKeyModal
-        visible={showApiKeyModal}
-        currentKey={apiKey}
-        onSave={handleApiKeySave}
-        onDismiss={() => setShowApiKeyModal(false)}
-      />
+      <FabNav active="home" onChange={onNav} />
     </View>
-  );
-}
-
-// --- Sous-composants locaux ---
-
-interface ErrorCardProps {
-  message: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  hint?: string;
-  onRetry: () => void;
-}
-
-function ErrorCard({ message, icon, hint, onRetry }: ErrorCardProps) {
-  return (
-    <View style={errorStyles.card}>
-      <View style={errorStyles.row}>
-        <Ionicons name={icon} size={20} color={COLORS.orange} />
-        <View style={errorStyles.texts}>
-          <Text style={errorStyles.message}>{message}</Text>
-          {hint && <Text style={errorStyles.hint}>{hint}</Text>}
-        </View>
-      </View>
-      <TouchableOpacity style={errorStyles.retry} onPress={onRetry}>
-        <Ionicons name="refresh" size={14} color={COLORS.primary} />
-        <Text style={errorStyles.retryText}>Réessayer</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function NoApiKeyCard({ onPress }: { onPress: () => void }) {
-  return (
-    <TouchableOpacity style={noKeyStyles.card} onPress={onPress}>
-      <Ionicons name="water-outline" size={24} color={COLORS.textMuted} />
-      <Text style={noKeyStyles.title}>Données de marée non configurées</Text>
-      <Text style={noKeyStyles.text}>
-        Appuyez pour entrer votre clé API api-maree.fr gratuite
-      </Text>
-      <View style={noKeyStyles.button}>
-        <Ionicons name="key-outline" size={14} color={COLORS.primary} />
-        <Text style={noKeyStyles.buttonText}>Configurer la clé API</Text>
-      </View>
-    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.background,
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoText: {
-    gap: 1,
-  },
-  appName: {
-    fontSize: 20,
-    letterSpacing: -0.3,
-  },
-  appNameMaree: {
-    fontFamily: FONTS.semiBold,
-    color: COLORS.textPrimary,
-  },
-  appNameSafe: {
-    fontFamily: FONTS.bold,
-    color: COLORS.primary,
-  },
-  appTagline: {
-    fontSize: 10,
-    fontFamily: FONTS.regular,
-    color: COLORS.textSecondary,
-    letterSpacing: 0.3,
-  },
-  date: {
-    fontSize: 12,
-    fontFamily: FONTS.regular,
-    color: COLORS.textMuted,
-    marginTop: 6,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  keyButton: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.surface,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-  },
-  footer: {
-    paddingTop: 16,
-    alignItems: 'center',
-  },
-  footerText: {
-    fontSize: 11,
-    color: COLORS.textMuted,
-    textAlign: 'center',
-  },
-});
+  screen:   { flex: 1, backgroundColor: COLORS.bg },
+  topBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 6 },
+  portBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  portName: { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  bellBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(14,23,38,0.05)', alignItems: 'center', justifyContent: 'center' },
 
-const errorStyles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.orangeBorder,
-    gap: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  texts: {
-    flex: 1,
-    gap: 4,
-  },
-  message: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    fontWeight: '500',
-  },
-  hint: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-  },
-  retry: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-end',
-  },
-  retryText: {
-    fontSize: 13,
-    color: COLORS.primary,
-  },
-});
+  scroll:        { flex: 1 },
+  scrollContent: { padding: 18, paddingBottom: 120 },
 
-const noKeyStyles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    gap: 8,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  text: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-    backgroundColor: 'rgba(14, 165, 233, 0.1)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(14, 165, 233, 0.25)',
-  },
-  buttonText: {
-    fontSize: 13,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
+  greeting:     { paddingHorizontal: 4, paddingBottom: 18 },
+  greetingDate: { fontSize: 12, fontFamily: FONTS.medium, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 1 },
+  greetingTitle:{ fontSize: 34, fontFamily: FONTS.display, letterSpacing: -0.5, marginTop: 6, color: COLORS.ink, lineHeight: 40 },
+  greetingMuted:{ color: COLORS.ink3 },
+
+  loading:     { alignItems: 'center', paddingVertical: 60, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: FONTS.regular, color: COLORS.ink3 },
+
+  // Verdict
+  verdictCard:  { borderRadius: 28, padding: 22, marginBottom: 14, position: 'relative' },
+  scoreBadge:   { position: 'absolute', top: 18, right: 18, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  scoreDot:     { width: 6, height: 6, borderRadius: 3 },
+  scoreTxt:     { fontSize: 11, fontFamily: FONTS.bold },
+  verdictTime:  { fontSize: 11, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 6 },
+  verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, marginBottom: 6 },
+  verdictSub:   { fontSize: 14, fontFamily: FONTS.regular, opacity: 0.85, marginBottom: 0, lineHeight: 20 },
+  windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 14, padding: 10 },
+  windowIcon:   { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(14,23,38,0.85)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  windowLabel:  { fontSize: 11, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
+  windowTime:   { fontSize: 16, fontFamily: FONTS.semiBold },
+
+  // KPI row
+  kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  kpiCard: { flex: 1, borderRadius: 28, padding: 16 },
+  kpiTide: { backgroundColor: COLORS.tide },
+  kpiSand: { backgroundColor: COLORS.sand },
+  kpiLilac:{ backgroundColor: COLORS.lilac },
+  kpiHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  kpiTag:  { fontSize: 9, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.6 },
+  kpiValue:{ fontSize: 26, fontFamily: FONTS.display, lineHeight: 28 },
+  kpiUnit: { fontSize: 13, opacity: 0.6 },
+  kpiSub:  { fontSize: 11, fontFamily: FONTS.regular, opacity: 0.7, marginTop: 4 },
+
+  // État de la mer
+  seaCard:     { backgroundColor: COLORS.ink, borderRadius: 28, padding: 18, marginBottom: 14 },
+  seaTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
+  seaTag:      { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONTS.semiBold, letterSpacing: 0.12, textTransform: 'uppercase' },
+  seaLabel:    { fontSize: 24, fontFamily: FONTS.display, color: '#fff', marginTop: 6 },
+  seaGrid:     { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)' },
+  seaStatLabel:{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontFamily: FONTS.semiBold, letterSpacing: 0.1, textTransform: 'uppercase', flex: 1 },
+  seaStatValue:{ fontSize: 19, fontFamily: FONTS.display, color: '#fff', marginTop: 4 },
+  seaStatUnit: { fontSize: 11, opacity: 0.6 },
+
+  // Action cards
+  planCard: { backgroundColor: COLORS.tideInk, borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
+  planIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.brand, alignItems: 'center', justifyContent: 'center' },
+  planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
+  planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.6)' },
+
+  boatCard: { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: COLORS.hairline },
+  boatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.paperSoft, alignItems: 'center', justifyContent: 'center' },
+  boatTitle:{ fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  boatSub:  { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
+
+  error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });
