@@ -30,8 +30,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-font",
-      "@react-native-community/slider"
+      "expo-font"
     ]
   }
 }
