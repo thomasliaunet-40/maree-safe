@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#16B5B0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Arrow up -->
+  <line x1="12" y1="3" x2="12" y2="11"/>
+  <polyline points="8 7 12 3 16 7"/>
+  <!-- Wave -->
+  <path d="M2 15 Q5 13 8 15 Q11 17 14 15 Q17 13 20 15 Q21.5 16 22 16"/>
+  <path d="M2 19 Q5 17 8 19 Q11 21 14 19 Q17 17 20 19 Q21.5 20 22 20"/>
+</svg>

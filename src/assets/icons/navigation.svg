@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#16B5B0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Hull -->
+  <path d="M3 17 C3 17 5 19 12 19 C19 19 21 17 21 17 L18 13 L6 13 Z"/>
+  <!-- Mast -->
+  <line x1="12" y1="13" x2="12" y2="4"/>
+  <!-- Main sail -->
+  <path d="M12 5 L18 13 L12 13 Z" fill="#16B5B0" fill-opacity="0.2"/>
+  <!-- Jib -->
+  <path d="M12 7 L6 13 L12 13 Z" fill="#16B5B0" fill-opacity="0.1"/>
+  <!-- Wave -->
+  <path d="M2 21 Q5 20 8 21 Q11 22 14 21 Q17 20 22 21" stroke="#ABE2E1" stroke-width="1"/>
+</svg>

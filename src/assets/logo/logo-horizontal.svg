@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 80" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <!-- Icon circle -->
+  <circle cx="40" cy="40" r="38" fill="#1E3A5F"/>
+  <!-- Lighthouse body -->
+  <rect x="34" y="30" width="12" height="22" rx="2" fill="#F2F4F7"/>
+  <polygon points="32,30 37,16 43,16 48,30" fill="#F2F4F7"/>
+  <rect x="35" y="11" width="10" height="6" rx="1" fill="#16B5B0"/>
+  <polygon points="40,11 22,5 22,11" fill="#16B5B0" opacity="0.5"/>
+  <rect x="34" y="42" width="12" height="3" fill="#16B5B0" opacity="0.6"/>
+  <!-- Waves -->
+  <path d="M6 62 Q16 58 26 62 Q36 66 46 62 Q56 58 68 62" fill="none" stroke="#16B5B0" stroke-width="2" stroke-linecap="round"/>
+  <path d="M10 70 Q20 66 30 70 Q40 74 50 70 Q60 66 72 70" fill="none" stroke="#ABE2E1" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- "Marée" text -->
+  <text x="90" y="37" font-family="Poppins, sans-serif" font-weight="600" font-size="22" fill="#F2F4F7">Marée</text>
+  <!-- "Safe" text in teal -->
+  <text x="90" y="60" font-family="Poppins, sans-serif" font-weight="700" font-size="22" fill="#16B5B0">Safe</text>
+  <!-- Tagline -->
+  <text x="90" y="74" font-family="Poppins, sans-serif" font-weight="400" font-size="10" fill="#ABE2E1" letter-spacing="1">La mer, en sécurité.</text>
+</svg>
