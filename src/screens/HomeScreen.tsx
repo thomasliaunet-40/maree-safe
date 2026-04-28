@@ -24,53 +24,41 @@ interface Props {
   onNav: (s: Screen) => void;
 }
 
-function gaugeColor(ratio: number): string {
-  if (ratio >= 1.0) return COLORS.stop;
-  if (ratio >= 0.75) return COLORS.warn;
-  return COLORS.go;
+const BADGE_PALETTE = {
+  green:  { bg: COLORS.go,   fg: COLORS.goInk },
+  orange: { bg: COLORS.warn, fg: '#7a3d18'    },
+  red:    { bg: COLORS.stop, fg: '#fff'        },
+};
+
+function badgeLevel(ratio: number): keyof typeof BADGE_PALETTE {
+  if (ratio >= 1.0) return 'red';
+  if (ratio >= 0.75) return 'orange';
+  return 'green';
 }
 
-function GaugeRow({ icon, iconColor, label, currentLabel, thresholdLabel, ratio }: {
+function ConditionBadge({ icon, label, value, sub, ratio }: {
   icon: Parameters<typeof Icon>[0]['name'];
-  iconColor: string;
   label: string;
-  currentLabel: string;
-  thresholdLabel: string;
+  value: string;
+  sub: string;
   ratio: number;
 }) {
-  const fill = Math.min(ratio, 1);
-  const color = gaugeColor(ratio);
+  const { bg, fg } = BADGE_PALETTE[badgeLevel(ratio)];
   return (
-    <View style={gaugeStyles.row}>
-      <View style={gaugeStyles.top}>
-        <View style={gaugeStyles.labelWrap}>
-          <Icon name={icon} size={13} stroke={iconColor} />
-          <Text style={gaugeStyles.label}>{label}</Text>
-        </View>
-        <View style={gaugeStyles.valueWrap}>
-          <Text style={[gaugeStyles.current, { color }]}>{currentLabel}</Text>
-          <Text style={gaugeStyles.separator}> / </Text>
-          <Text style={gaugeStyles.threshold}>{thresholdLabel}</Text>
-        </View>
-      </View>
-      <View style={gaugeStyles.barBg}>
-        <View style={[gaugeStyles.barFill, { width: `${fill * 100}%`, backgroundColor: color }]} />
-      </View>
+    <View style={[badgeStyles.card, { backgroundColor: bg }]}>
+      <Icon name={icon} size={15} stroke={fg} />
+      <Text style={[badgeStyles.value, { color: fg }]}>{value}</Text>
+      <Text style={[badgeStyles.label, { color: fg }]}>{label}</Text>
+      <Text style={[badgeStyles.sub, { color: fg }]}>{sub}</Text>
     </View>
   );
 }
 
-const gaugeStyles = StyleSheet.create({
-  row:       { paddingVertical: 12 },
-  top:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  labelWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  label:     { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  valueWrap: { flexDirection: 'row', alignItems: 'baseline' },
-  current:   { fontSize: 15, fontFamily: FONTS.display },
-  separator: { fontSize: 12, color: COLORS.ink4 },
-  threshold: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
-  barBg:     { height: 6, borderRadius: 3, backgroundColor: COLORS.hairline, overflow: 'hidden' },
-  barFill:   { height: 6, borderRadius: 3 },
+const badgeStyles = StyleSheet.create({
+  card:  { flex: 1, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 10, alignItems: 'center', gap: 3 },
+  value: { fontSize: 19, fontFamily: FONTS.display, lineHeight: 22, marginTop: 4 },
+  label: { fontSize: 11, fontFamily: FONTS.semiBold, textTransform: 'uppercase', letterSpacing: 0.1 },
+  sub:   { fontSize: 10, fontFamily: FONTS.regular, opacity: 0.7 },
 });
 
 function scoreColor(s: number) {
@@ -235,44 +223,38 @@ export default function HomeScreen({
               )}
             </View>
 
-            {/* Jauges conditions vs seuils */}
+            {/* Conditions vs seuils — vignettes colorées */}
             {weatherData && (
-              <TouchableOpacity style={styles.gaugesCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
-                <View style={styles.gaugesHeader}>
-                  <Text style={styles.gaugesTitle}>Conditions vs mes seuils</Text>
+              <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
+                <View style={styles.condHeader}>
+                  <Text style={styles.condTitle}>Conditions vs mes seuils</Text>
                   <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
                 </View>
-
-                <GaugeRow
-                  icon="wind" iconColor={COLORS.sandInk}
-                  label="Vent"
-                  currentLabel={`${Math.round(displayWind)} kn`}
-                  thresholdLabel={`${boat.maxWind} kn max`}
-                  ratio={displayWind / boat.maxWind}
-                />
-
-                <View style={styles.gaugeDivider} />
-
-                <GaugeRow
-                  icon="wave" iconColor={COLORS.tideInk}
-                  label="Vagues"
-                  currentLabel={`${displayWaveH.toFixed(1)} m`}
-                  thresholdLabel={`${boat.maxWaves} m max`}
-                  ratio={displayWaveH / boat.maxWaves}
-                />
-
-                {displayTideH > 0 && (
-                  <>
-                    <View style={styles.gaugeDivider} />
-                    <GaugeRow
-                      icon="anchor" iconColor={COLORS.lilacInk}
-                      label="Hauteur d'eau"
-                      currentLabel={`${displayTideH.toFixed(1)} m`}
-                      thresholdLabel={`TE ${boat.draft} m`}
+                <View style={styles.condRow}>
+                  <ConditionBadge
+                    icon="wind"
+                    label="Vent"
+                    value={`${Math.round(displayWind)} kn`}
+                    sub={`max ${boat.maxWind} kn`}
+                    ratio={displayWind / boat.maxWind}
+                  />
+                  <ConditionBadge
+                    icon="wave"
+                    label="Vagues"
+                    value={`${displayWaveH.toFixed(1)} m`}
+                    sub={`max ${boat.maxWaves} m`}
+                    ratio={displayWaveH / boat.maxWaves}
+                  />
+                  {displayTideH > 0 && (
+                    <ConditionBadge
+                      icon="anchor"
+                      label="Hauteur"
+                      value={`${displayTideH.toFixed(1)} m`}
+                      sub={`TE ${boat.draft} m`}
                       ratio={boat.draft / displayTideH}
                     />
-                  </>
-                )}
+                  )}
+                </View>
               </TouchableOpacity>
             )}
 
@@ -437,11 +419,11 @@ const styles = StyleSheet.create({
   nowChip:     { alignSelf: 'center', marginTop: 10, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   nowChipText: { fontSize: 11, fontFamily: FONTS.semiBold },
 
-  // Jauges
-  gaugesCard:    { backgroundColor: COLORS.paper, borderRadius: 28, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
-  gaugesHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  gaugesTitle:   { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
-  gaugeDivider:  { height: 1, backgroundColor: COLORS.hairline },
+  // Conditions vs seuils
+  condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
+  condHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  condTitle:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
+  condRow:    { flexDirection: 'row', gap: 8 },
 
   // KPI row
   kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
