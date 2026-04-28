@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
@@ -7,8 +7,9 @@ import { degreesToCompass } from '../utils/windDirection';
 import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
-import VerdictTimeline from '../components/VerdictTimeline';
+import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
 import Compass from '../components/Compass';
+import { computeScore } from '../utils/verdictCalculator';
 
 interface Props {
   port: Port;
@@ -91,11 +92,6 @@ function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): H
   return hourly.find(h => h.time.startsWith(prefix)) ?? null;
 }
 
-function formatScrubHour(h: number): string {
-  const whole = Math.floor(h);
-  const mins = h % 1 >= 0.5 ? '30' : '00';
-  return `${String(whole).padStart(2, '0')}h${mins}`;
-}
 
 function findTideHeight(points: TideData['points'], hour: number, date: Date): number | null {
   const y = date.getFullYear();
@@ -105,37 +101,89 @@ function findTideHeight(points: TideData['points'], hour: number, date: Date): n
   return points.find(p => p.time.startsWith(prefix))?.height ?? null;
 }
 
+// Calcule scores + hauteurs marée sur une fenêtre de N heures à partir d'un timestamp
+function buildTimelineData(
+  startMs: number,
+  totalHours: number,
+  weatherData: WeatherData,
+  tideData: TideData | null,
+  boat: BoatSettings
+): { scores: number[]; tideHeights: number[] } {
+  const scores: number[] = [];
+  const tideHeights: number[] = [];
+  for (let i = 0; i < totalHours; i++) {
+    const d = new Date(startMs + i * 3600000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const prefix = `${y}-${m}-${dd}T${hh}`;
+    const w = weatherData.hourly.find(x => x.time.startsWith(prefix));
+    const tp = tideData?.points.find(p => p.time.startsWith(prefix));
+    const tideH = tp?.height ?? null;
+    scores.push(w ? computeScore(w.windSpeed, w.windGust, w.waveHeight, boat, tideH ?? undefined) : 50);
+    tideHeights.push(tideH ?? 0);
+  }
+  return { scores, tideHeights };
+}
+
+const PAST_HOURS = 2;
+const FUTURE_HOURS = 48;
+const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
+
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
   boat, selectedDate, isToday, onNav,
 }: Props) {
-  const hour = new Date().getHours();
-  const [scrubHour, setScrubHour] = useState<number | null>(null);
+  const nowRef = useRef(new Date());
+  const now = nowRef.current;
+  const hour = now.getHours();
 
-  // Réinitialise le scrub quand on change de date
-  useEffect(() => { setScrubHour(null); }, [selectedDate]);
+  const timelineRef = useRef<VerdictTimelineHandle>(null);
+  // scrubOffset : décalage en heures depuis "maintenant" (null = maintenant)
+  const [scrubOffset, setScrubOffset] = useState<number | null>(null);
 
-  const displayHour = scrubHour ?? (isToday ? hour : 12);
-  const displayHourInt = Math.min(23, Math.round(displayHour));
-  const displayScore = verdict?.hourlyScores[displayHourInt] ?? verdict?.score ?? 0;
+  useEffect(() => {
+    setScrubOffset(null);
+    timelineRef.current?.scrollToNow();
+  }, [selectedDate]);
+
+  // Timestamp de début de la fenêtre timeline (-2h)
+  const startEpoch = useMemo(() => now.getTime() - PAST_HOURS * 3600000, []);
+
+  // Données 50h calculées depuis weatherData
+  const { scores: scores50h, tideHeights: tideH50 } = useMemo(() => {
+    if (!weatherData) return { scores: Array(TOTAL_HOURS).fill(50), tideHeights: Array(TOTAL_HOURS).fill(0) };
+    return buildTimelineData(startEpoch, TOTAL_HOURS, weatherData, tideData, boat);
+  }, [weatherData, tideData, boat]);
+
+  // Heure/date affichée selon le scrub
+  const displayMs = scrubOffset !== null ? now.getTime() + scrubOffset * 3600000 : now.getTime();
+  const displayDate = new Date(displayMs);
+  const displayHourInt = displayDate.getHours();
+
+  const displayScoreIdx = Math.max(0, Math.min(TOTAL_HOURS - 1, Math.round((scrubOffset ?? 0) + PAST_HOURS)));
+  const displayScore = scrubOffset !== null
+    ? (scores50h[displayScoreIdx] ?? 50)
+    : (verdict?.hourlyScores[hour] ?? verdict?.score ?? 0);
   const { bg, ink } = scoreColor(displayScore);
 
   // Données météo et marée à l'heure affichée
-  const hourlyW = scrubHour !== null && weatherData
-    ? findHourlyWeather(weatherData.hourly, Math.floor(displayHour), selectedDate)
+  const hourlyW = scrubOffset !== null && weatherData
+    ? findHourlyWeather(weatherData.hourly, displayHourInt, displayDate)
     : null;
-  const displayWind      = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
-  const displayGust      = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
-  const displayWaveH     = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
-  const displayTideH     = scrubHour !== null && tideData
-    ? (findTideHeight(tideData.points, Math.floor(displayHour), selectedDate) ?? tideData.currentHeight)
+  const displayWind  = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
+  const displayGust  = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
+  const displayWaveH = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
+  const displayTideH = scrubOffset !== null && tideData
+    ? (findTideHeight(tideData.points, displayHourInt, displayDate) ?? tideData.currentHeight)
     : tideData?.currentHeight ?? 0;
 
-  const isScrubbing = scrubHour !== null;
+  const isScrubbing = scrubOffset !== null;
 
   const nextTide = (() => {
     if (!tideData) return null;
-    const nowH = hour + new Date().getMinutes() / 60;
+    const nowH = hour + now.getMinutes() / 60;
     return tideData.peaks.find(p => {
       const [h, m] = p.time.split('T')[1]?.split(':') ?? ['0', '0'];
       return parseInt(h) + parseInt(m) / 60 > nowH;
@@ -185,14 +233,14 @@ export default function HomeScreen({
             {/* Verdict card */}
             <View style={[styles.verdictCard, { backgroundColor: bg }]}>
               <TouchableOpacity
-                onPress={() => isScrubbing ? setScrubHour(null) : undefined}
+                onPress={() => { setScrubOffset(null); timelineRef.current?.scrollToNow(); }}
                 activeOpacity={isScrubbing ? 0.6 : 1}
               >
                 <Text style={[styles.verdictTime, { color: ink }]}>
                   {isScrubbing
-                    ? `→ ${formatScrubHour(displayHour)}`
+                    ? `→ ${String(displayHourInt).padStart(2, '0')}h${displayDate.getMinutes() >= 30 ? '30' : '00'}`
                     : isToday
-                    ? `Maintenant · ${String(hour).padStart(2, '0')}:00`
+                    ? `Maintenant · ${String(hour).padStart(2, '0')}h00`
                     : dateLabel}
                 </Text>
               </TouchableOpacity>
@@ -203,10 +251,12 @@ export default function HomeScreen({
               {/* Timeline */}
               <View style={{ marginTop: 20 }}>
                 <VerdictTimeline
-                  hourlyScores={verdict.hourlyScores}
-                  currentHour={displayHour}
-                  minHour={isToday ? hour : 0}
-                  onHourChange={setScrubHour}
+                  ref={timelineRef}
+                  scores={isToday ? scores50h : verdict.hourlyScores}
+                  tideHeights={isToday ? tideH50 : undefined}
+                  startEpoch={isToday ? startEpoch : new Date(selectedDate).setHours(0, 0, 0, 0)}
+                  cursorHourOffset={isToday ? PAST_HOURS : Math.min(hour, 22)}
+                  onOffsetChange={isToday ? setScrubOffset : undefined}
                 />
               </View>
 
@@ -222,6 +272,7 @@ export default function HomeScreen({
                 const windows = isToday
                   ? verdict.recommendedWindows.filter(w => w.end >= hour)
                   : verdict.recommendedWindows;
+
                 return windows.length > 0 ? (
                 <View style={styles.windowRow}>
                   <View style={[styles.windowIcon, { backgroundColor: `${ink}CC` }]}>

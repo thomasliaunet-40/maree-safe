@@ -1,8 +1,12 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, PanResponder } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Line, Path, Circle } from 'react-native-svg';
+import React, { useRef, forwardRef, useImperativeHandle } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import Svg, { Rect, Path, Line } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
 import { COLORS } from '../constants/colors';
+
+const PPH = 42; // pixels per hour
+const SVG_H = 84;
+const TICK_H = 22;
 
 function scoreToColor(s: number): string {
   if (s >= 75) return '#8fc8a3';
@@ -11,116 +15,159 @@ function scoreToColor(s: number): string {
   return '#e88a82';
 }
 
+export interface VerdictTimelineHandle {
+  scrollToNow: () => void;
+}
+
 interface Props {
-  hourlyScores: number[];
-  currentHour: number;
-  minHour?: number; // heure minimale accessible (heure réelle pour aujourd'hui)
-  onHourChange?: (hour: number) => void;
+  scores: number[];        // N valeurs, une par heure
+  tideHeights?: number[];  // N valeurs, hauteur marée
+  startEpoch: number;      // timestamp ms de l'index 0
+  cursorHourOffset: number; // heures depuis index 0 où le curseur est fixé
+  onOffsetChange?: (offsetFromCursor: number) => void; // heures depuis cursorHourOffset
 }
 
-export default function VerdictTimeline({ hourlyScores, currentHour, minHour = 0, onHourChange }: Props) {
-  const W = 320;
-  const H = 84;
-  const [barWidth, setBarWidth] = useState(320);
-  const nowX = (currentHour / 24) * W;
-  const minX = (minHour / 24) * W; // début de la zone accessible
+const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
+  ({ scores, tideHeights, startEpoch, cursorHourOffset, onOffsetChange }, ref) => {
+    const scrollRef = useRef<ScrollView>(null);
+    const totalHours = scores.length;
+    const contentWidth = totalHours * PPH;
+    const cursorX = cursorHourOffset * PPH;
 
-  const snap = (x: number) => {
-    const raw = (Math.max(0, Math.min(barWidth, x)) / barWidth) * 24;
-    return Math.min(23.5, Math.max(minHour, Math.round(raw * 2) / 2));
-  };
+    useImperativeHandle(ref, () => ({
+      scrollToNow: () => scrollRef.current?.scrollTo({ x: 0, animated: true }),
+    }));
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => onHourChange?.(snap(evt.nativeEvent.locationX)),
-      onPanResponderMove: (evt)  => onHourChange?.(snap(evt.nativeEvent.locationX)),
-    })
-  ).current;
+    const handleScroll = (scrollX: number) => {
+      const contentX = scrollX + cursorX;
+      const offsetFromCursor = contentX / PPH - cursorHourOffset;
+      const snapped = Math.round(offsetFromCursor * 2) / 2;
+      onOffsetChange?.(snapped);
+    };
 
-  const tidePts: string[] = [];
-  for (let i = 0; i <= 48; i++) {
-    const x = (i / 48) * W;
-    const y = H / 2 - Math.sin((i / 48 * 4 * Math.PI) - Math.PI / 3) * (H * 0.32);
-    tidePts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
-  }
-  const tidePath = 'M ' + tidePts.join(' L ');
+    // Courbe de marée
+    const hasTide = tideHeights && tideHeights.some(h => h > 0);
+    let tidePath = '';
+    if (hasTide && tideHeights) {
+      const valid = tideHeights.filter(h => h > 0);
+      const minH = Math.min(...valid);
+      const maxH = Math.max(...valid);
+      const range = Math.max(maxH - minH, 0.5);
+      const pts = tideHeights.map((h, i) => {
+        const x = i * PPH + PPH / 2;
+        const hv = h > 0 ? h : minH;
+        const y = SVG_H * 0.85 - ((hv - minH) / range) * (SVG_H * 0.55);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      tidePath = 'M ' + pts.join(' L ');
+    }
 
-  return (
-    <View>
-      <View
-        style={styles.bar}
-        onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
-      >
-        <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-          <Defs>
-            {hourlyScores.map((_, i) => (
-              <LinearGradient key={i} id={`g${i}`} x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0%" stopColor={scoreToColor(hourlyScores[i])} stopOpacity="1" />
-                <Stop offset="100%" stopColor={scoreToColor(hourlyScores[Math.min(i + 1, 23)])} stopOpacity="1" />
-              </LinearGradient>
+    // Repères toutes les 6h
+    const ticks: { i: number; label: string }[] = [];
+    for (let i = 0; i <= totalHours; i += 6) {
+      const d = new Date(startEpoch + i * 3600000);
+      ticks.push({ i, label: `${String(d.getHours()).padStart(2, '0')}h` });
+    }
+
+    return (
+      <View style={styles.outer}>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          onScroll={e => handleScroll(e.nativeEvent.contentOffset.x)}
+          scrollEventThrottle={16}
+          contentContainerStyle={{ width: contentWidth }}
+        >
+          {/* Contenu scrollable : barres + marée + repères */}
+          <View style={{ width: contentWidth, height: SVG_H + TICK_H }}>
+            <Svg width={contentWidth} height={SVG_H}>
+              {scores.map((score, i) => (
+                <Rect key={i} x={i * PPH} y={0} width={PPH + 1} height={SVG_H} fill={scoreToColor(score)} />
+              ))}
+              {hasTide && (
+                <Path
+                  d={tidePath}
+                  fill="none"
+                  stroke="rgba(255,255,255,0.85)"
+                  strokeWidth={1.5}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              )}
+              {ticks.map(t => (
+                <Line
+                  key={t.i}
+                  x1={t.i * PPH} y1={SVG_H - 10}
+                  x2={t.i * PPH} y2={SVG_H}
+                  stroke="rgba(255,255,255,0.35)"
+                  strokeWidth={1}
+                />
+              ))}
+            </Svg>
+            {/* Labels des repères */}
+            {ticks.map(t => (
+              <View
+                key={t.i}
+                style={[styles.tickWrap, { left: t.i * PPH - 14 }]}
+              >
+                <Text style={styles.tick}>{t.label}</Text>
+              </View>
             ))}
-          </Defs>
-          {hourlyScores.map((_, i) => {
-            const x = (i / 24) * W;
-            const w = W / 24;
-            return <Rect key={i} x={x} y={0} width={w + 0.5} height={H} fill={`url(#g${i})`} />;
-          })}
+          </View>
+        </ScrollView>
 
-          <Path
-            d={tidePath}
-            fill="none"
-            stroke="rgba(255,255,255,0.85)"
-            strokeWidth={1.5}
-            vectorEffect="non-scaling-stroke"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Zone passée assombrie */}
-          {minX > 0 && (
-            <Rect x={0} y={0} width={minX} height={H} fill="rgba(0,0,0,0.28)" />
-          )}
-
-          {/* Cursor line */}
-          <Line
-            x1={nowX} y1={0} x2={nowX} y2={H}
-            stroke="rgba(255,255,255,0.95)" strokeWidth={2.5}
-          />
-          {/* Drag handle: white circle + dark center */}
-          <Circle cx={nowX} cy={H / 2} r={8} fill="rgba(255,255,255,0.95)" />
-          <Circle cx={nowX} cy={H / 2} r={3.5} fill={COLORS.ink} opacity={0.65} />
-        </Svg>
-
-        {/* Transparent touch overlay */}
-        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
+        {/* Curseur fixe */}
+        <View style={StyleSheet.absoluteFill} pointerEvents="none">
+          <View style={[styles.cursorLine, { left: cursorX - 1 }]} />
+          <View style={[styles.cursorCircle, { left: cursorX - 8, top: SVG_H / 2 - 8 }]} />
+          <View style={[styles.cursorDot, { left: cursorX - 3.5, top: SVG_H / 2 - 3.5 }]} />
+        </View>
       </View>
+    );
+  }
+);
 
-      <View style={styles.ticks}>
-        {['0h', '6h', '12h', '18h', '24h'].map(t => (
-          <Text key={t} style={styles.tick}>{t}</Text>
-        ))}
-      </View>
-    </View>
-  );
-}
+export default VerdictTimeline;
 
 const styles = StyleSheet.create({
-  bar: {
-    height: 84,
+  outer: {
     borderRadius: 18,
     overflow: 'hidden',
+    height: SVG_H + TICK_H,
+    position: 'relative',
   },
-  ticks: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-    paddingHorizontal: 2,
+  tickWrap: {
+    position: 'absolute',
+    top: SVG_H + 4,
+    width: 28,
+    alignItems: 'center',
   },
   tick: {
     fontSize: 10,
     fontFamily: FONTS.mono,
-    color: COLORS.ink3,
+    color: 'rgba(255,255,255,0.55)',
+  },
+  cursorLine: {
+    position: 'absolute',
+    top: 0,
+    width: 2.5,
+    height: SVG_H,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+  cursorCircle: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+  },
+  cursorDot: {
+    position: 'absolute',
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: COLORS.ink,
+    opacity: 0.65,
   },
 });
