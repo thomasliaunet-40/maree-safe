@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { TideData, WeatherData, VerdictResult, Port, BoatSettings } from '../types';
+import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import { degreesToCompass } from '../utils/windDirection';
@@ -80,13 +80,48 @@ function scoreColor(s: number) {
   return           { bg: COLORS.stop,     ink: '#fff' };
 }
 
+function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): HourlyWeather | null {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const prefix = `${y}-${m}-${d}T${String(hour).padStart(2, '0')}`;
+  return hourly.find(h => h.time.startsWith(prefix)) ?? null;
+}
+
+function findTideHeight(points: TideData['points'], hour: number, date: Date): number | null {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  const prefix = `${y}-${m}-${d}T${String(hour).padStart(2, '0')}`;
+  return points.find(p => p.time.startsWith(prefix))?.height ?? null;
+}
+
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
   boat, selectedDate, isToday, onNav,
 }: Props) {
   const hour = new Date().getHours();
-  const score = verdict?.score ?? 0;
-  const { bg, ink } = scoreColor(score);
+  const [scrubHour, setScrubHour] = useState<number | null>(null);
+
+  // Réinitialise le scrub quand on change de date
+  useEffect(() => { setScrubHour(null); }, [selectedDate]);
+
+  const displayHour = scrubHour ?? (isToday ? hour : 12);
+  const displayScore = verdict?.hourlyScores[displayHour] ?? verdict?.score ?? 0;
+  const { bg, ink } = scoreColor(displayScore);
+
+  // Données météo et marée à l'heure affichée
+  const hourlyW = scrubHour !== null && weatherData
+    ? findHourlyWeather(weatherData.hourly, displayHour, selectedDate)
+    : null;
+  const displayWind      = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
+  const displayGust      = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
+  const displayWaveH     = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
+  const displayTideH     = scrubHour !== null && tideData
+    ? (findTideHeight(tideData.points, displayHour, selectedDate) ?? tideData.currentHeight)
+    : tideData?.currentHeight ?? 0;
+
+  const isScrubbing = scrubHour !== null;
 
   const nextTide = (() => {
     if (!tideData) return null;
@@ -140,7 +175,11 @@ export default function HomeScreen({
             {/* Verdict card */}
             <View style={[styles.verdictCard, { backgroundColor: bg }]}>
               <Text style={[styles.verdictTime, { color: ink }]}>
-                {isToday ? `Maintenant · ${String(hour).padStart(2, '0')}:00` : dateLabel}
+                {isScrubbing
+                  ? `→ ${String(displayHour).padStart(2, '0')}h00`
+                  : isToday
+                  ? `Maintenant · ${String(hour).padStart(2, '0')}:00`
+                  : dateLabel}
               </Text>
               <Text style={[styles.verdictTitle, { color: ink }]} numberOfLines={1}>
                 Conditions de navigation
@@ -151,8 +190,18 @@ export default function HomeScreen({
                 <VerdictTimeline
                   hourlyScores={verdict.hourlyScores}
                   recommendedWindow={verdict.recommendedWindow}
-                  currentHour={isToday ? hour : 12}
+                  currentHour={displayHour}
+                  onHourChange={setScrubHour}
                 />
+                {isScrubbing && isToday && (
+                  <TouchableOpacity
+                    style={[styles.nowChip, { borderColor: `${ink}40` }]}
+                    onPress={() => setScrubHour(null)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.nowChipText, { color: ink }]}>← Maintenant</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Coefficient de l'étale suivante */}
@@ -192,9 +241,9 @@ export default function HomeScreen({
                 <GaugeRow
                   icon="wind" iconColor={COLORS.sandInk}
                   label="Vent"
-                  currentLabel={`${Math.round(weatherData.windSpeed)} kn`}
+                  currentLabel={`${Math.round(displayWind)} kn`}
                   thresholdLabel={`${boat.maxWind} kn max`}
-                  ratio={weatherData.windSpeed / boat.maxWind}
+                  ratio={displayWind / boat.maxWind}
                 />
 
                 <View style={styles.gaugeDivider} />
@@ -202,20 +251,20 @@ export default function HomeScreen({
                 <GaugeRow
                   icon="wave" iconColor={COLORS.tideInk}
                   label="Vagues"
-                  currentLabel={`${weatherData.waveHeight.toFixed(1)} m`}
+                  currentLabel={`${displayWaveH.toFixed(1)} m`}
                   thresholdLabel={`${boat.maxWaves} m max`}
-                  ratio={weatherData.waveHeight / boat.maxWaves}
+                  ratio={displayWaveH / boat.maxWaves}
                 />
 
-                {tideData && tideData.currentHeight > 0 && (
+                {displayTideH > 0 && (
                   <>
                     <View style={styles.gaugeDivider} />
                     <GaugeRow
                       icon="anchor" iconColor={COLORS.lilacInk}
                       label="Hauteur d'eau"
-                      currentLabel={`${tideData.currentHeight.toFixed(1)} m`}
+                      currentLabel={`${displayTideH.toFixed(1)} m`}
                       thresholdLabel={`TE ${boat.draft} m`}
-                      ratio={boat.draft / tideData.currentHeight}
+                      ratio={boat.draft / displayTideH}
                     />
                   </>
                 )}
@@ -377,6 +426,10 @@ const styles = StyleSheet.create({
   windowLabel:  { fontSize: 12, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
   windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
+
+  // Chip retour à maintenant
+  nowChip:     { alignSelf: 'center', marginTop: 10, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  nowChipText: { fontSize: 11, fontFamily: FONTS.semiBold },
 
   // Jauges
   gaugesCard:    { backgroundColor: COLORS.paper, borderRadius: 28, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },

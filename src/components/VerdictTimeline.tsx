@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Line, Path } from 'react-native-svg';
+import React, { useRef, useState } from 'react';
+import { View, Text, StyleSheet, PanResponder } from 'react-native';
+import Svg, { Defs, LinearGradient, Stop, Rect, Line, Path, Circle } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
 import { COLORS } from '../constants/colors';
 
@@ -15,14 +15,30 @@ interface Props {
   hourlyScores: number[];
   recommendedWindow: { start: number; end: number } | null;
   currentHour: number;
+  onHourChange?: (hour: number) => void;
 }
 
-export default function VerdictTimeline({ hourlyScores, recommendedWindow, currentHour }: Props) {
+export default function VerdictTimeline({ hourlyScores, currentHour, onHourChange }: Props) {
   const W = 320;
   const H = 84;
-  const nowPct = (currentHour / 24) * 100;
+  const [barWidth, setBarWidth] = useState(320);
+  const nowX = (currentHour / 24) * W;
 
-  // Courbe sinusoïdale symbolique : 2 cycles sur 24h, légèrement décalés
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
+        onHourChange?.(Math.min(23, Math.max(0, Math.round((x / barWidth) * 23.99))));
+      },
+      onPanResponderMove: (evt) => {
+        const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
+        onHourChange?.(Math.min(23, Math.max(0, Math.round((x / barWidth) * 23.99))));
+      },
+    })
+  ).current;
+
   const tidePts: string[] = [];
   for (let i = 0; i <= 48; i++) {
     const x = (i / 48) * W;
@@ -33,7 +49,10 @@ export default function VerdictTimeline({ hourlyScores, recommendedWindow, curre
 
   return (
     <View>
-      <View style={styles.bar}>
+      <View
+        style={styles.bar}
+        onLayout={e => setBarWidth(e.nativeEvent.layout.width)}
+      >
         <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
           <Defs>
             {hourlyScores.map((_, i) => (
@@ -49,7 +68,6 @@ export default function VerdictTimeline({ hourlyScores, recommendedWindow, curre
             return <Rect key={i} x={x} y={0} width={w + 0.5} height={H} fill={`url(#g${i})`} />;
           })}
 
-          {/* Courbe symbolique de marée */}
           <Path
             d={tidePath}
             fill="none"
@@ -60,17 +78,20 @@ export default function VerdictTimeline({ hourlyScores, recommendedWindow, curre
             strokeLinejoin="round"
           />
 
-          {/* Curseur maintenant */}
+          {/* Cursor line */}
           <Line
-            x1={(nowPct / 100) * W}
-            y1={-4}
-            x2={(nowPct / 100) * W}
-            y2={H + 4}
-            stroke={COLORS.ink}
-            strokeWidth={3}
+            x1={nowX} y1={0} x2={nowX} y2={H}
+            stroke="rgba(255,255,255,0.95)" strokeWidth={2.5}
           />
+          {/* Drag handle: white circle + dark center */}
+          <Circle cx={nowX} cy={H / 2} r={8} fill="rgba(255,255,255,0.95)" />
+          <Circle cx={nowX} cy={H / 2} r={3.5} fill={COLORS.ink} opacity={0.65} />
         </Svg>
+
+        {/* Transparent touch overlay */}
+        <View style={StyleSheet.absoluteFill} {...panResponder.panHandlers} />
       </View>
+
       <View style={styles.ticks}>
         {['0h', '6h', '12h', '18h', '24h'].map(t => (
           <Text key={t} style={styles.tick}>{t}</Text>
