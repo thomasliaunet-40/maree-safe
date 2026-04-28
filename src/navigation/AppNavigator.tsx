@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, BackHandler } from 'react-native';
 import { Port, TideData, WeatherData, VerdictResult, BoatSettings, BOAT_DEFAULT } from '../types';
 import { COLORS } from '../constants/colors';
 import { ALL_PORTS } from '../constants/ports';
@@ -124,6 +124,15 @@ export default function AppNavigator() {
     setSelectedDate(nd);
     setScreen('home');
   };
+
+  // Bouton retour Android : home d'abord, puis quitter
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (screen !== 'home') { setScreen('home'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [screen]);
 
   const isToday = isSameDay(selectedDate, new Date());
   const commonProps = { onNav: setScreen };

@@ -273,7 +273,7 @@ export default function HomeScreen({
                 <Icon name="boat" size={18} stroke={COLORS.ink2} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.boatTitle}>Mon voilier</Text>
+                <Text style={styles.boatTitle}>{boat.name}</Text>
                 <Text style={styles.boatSub}>Seuils : {boat.maxWind} kn · {boat.maxWaves} m</Text>
               </View>
               <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />

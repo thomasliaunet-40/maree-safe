@@ -59,19 +59,19 @@ export interface VerdictResult {
 }
 
 export interface BoatSettings {
-  type: 'derive' | 'voilier-quillard' | 'cata' | 'hauturier';
-  length: number;
+  name: string;
   draft: number;
-  experience: 'Débutant' | 'Confirmé' | 'Expert';
   maxWind: number;
   maxWaves: number;
+  // champs legacy conservés pour compatibilité AsyncStorage
+  type?: string;
+  length?: number;
+  experience?: string;
 }
 
 export const BOAT_DEFAULT: BoatSettings = {
-  type: 'voilier-quillard',
-  length: 9.5,
+  name: 'Mon voilier',
   draft: 1.8,
-  experience: 'Confirmé',
   maxWind: 25,
   maxWaves: 1.8,
 };
