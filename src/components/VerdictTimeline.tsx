@@ -14,29 +14,28 @@ function scoreToColor(s: number): string {
 interface Props {
   hourlyScores: number[];
   currentHour: number;
+  minHour?: number; // heure minimale accessible (heure réelle pour aujourd'hui)
   onHourChange?: (hour: number) => void;
 }
 
-export default function VerdictTimeline({ hourlyScores, currentHour, onHourChange }: Props) {
+export default function VerdictTimeline({ hourlyScores, currentHour, minHour = 0, onHourChange }: Props) {
   const W = 320;
   const H = 84;
   const [barWidth, setBarWidth] = useState(320);
   const nowX = (currentHour / 24) * W;
+  const minX = (minHour / 24) * W; // début de la zone accessible
+
+  const snap = (x: number) => {
+    const raw = (Math.max(0, Math.min(barWidth, x)) / barWidth) * 24;
+    return Math.min(23.5, Math.max(minHour, Math.round(raw * 2) / 2));
+  };
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
-        const raw = (x / barWidth) * 24;
-        onHourChange?.(Math.min(23.5, Math.max(0, Math.round(raw * 2) / 2)));
-      },
-      onPanResponderMove: (evt) => {
-        const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
-        const raw = (x / barWidth) * 24;
-        onHourChange?.(Math.min(23.5, Math.max(0, Math.round(raw * 2) / 2)));
-      },
+      onPanResponderGrant: (evt) => onHourChange?.(snap(evt.nativeEvent.locationX)),
+      onPanResponderMove: (evt)  => onHourChange?.(snap(evt.nativeEvent.locationX)),
     })
   ).current;
 
@@ -78,6 +77,11 @@ export default function VerdictTimeline({ hourlyScores, currentHour, onHourChang
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+
+          {/* Zone passée assombrie */}
+          {minX > 0 && (
+            <Rect x={0} y={0} width={minX} height={H} fill="rgba(0,0,0,0.28)" />
+          )}
 
           {/* Cursor line */}
           <Line

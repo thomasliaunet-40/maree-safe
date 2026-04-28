@@ -190,6 +190,7 @@ export default function HomeScreen({
                 <VerdictTimeline
                   hourlyScores={verdict.hourlyScores}
                   currentHour={displayHour}
+                  minHour={isToday ? hour : 0}
                   onHourChange={setScrubHour}
                 />
               </View>
@@ -201,17 +202,21 @@ export default function HomeScreen({
                 </Text>
               )}
 
-              {/* Fenêtres optimales */}
-              {verdict.recommendedWindows.length > 0 && (
+              {/* Fenêtres optimales — uniquement celles qui ne sont pas passées */}
+              {(() => {
+                const windows = isToday
+                  ? verdict.recommendedWindows.filter(w => w.end >= hour)
+                  : verdict.recommendedWindows;
+                return windows.length > 0 ? (
                 <View style={styles.windowRow}>
                   <View style={[styles.windowIcon, { backgroundColor: `${ink}CC` }]}>
                     <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.windowLabel, { color: ink }]}>
-                      {verdict.recommendedWindows.length > 1 ? 'FENÊTRES OPTIMALES' : 'FENÊTRE OPTIMALE'}
+                      {windows.length > 1 ? 'FENÊTRES OPTIMALES' : 'FENÊTRE OPTIMALE'}
                     </Text>
-                    {verdict.recommendedWindows.map((w, i) => (
+                    {windows.map((w, i) => (
                       <View key={i} style={i > 0 ? styles.windowSep : undefined}>
                         <Text style={[styles.windowTime, { color: ink }]}>
                           {w.start}h00 — {w.end + 1}h00
@@ -223,7 +228,7 @@ export default function HomeScreen({
                     ))}
                   </View>
                 </View>
-              )}
+              ) : null; })()}
             </View>
 
             {/* Conditions vs seuils — vignettes colorées */}
