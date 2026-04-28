@@ -83,7 +83,7 @@ export default function AppNavigator() {
       setWeatherError((weatherRes.reason as Error).message);
     }
 
-    if (newWeather) setVerdict(calculateVerdict(newWeather, boat, date));
+    if (newWeather) setVerdict(calculateVerdict(newWeather, boat, date, newTide));
     setLoading(false);
   }, []);
 
@@ -93,7 +93,7 @@ export default function AppNavigator() {
 
   // Recalcule verdict quand le bateau actif change
   useEffect(() => {
-    if (weatherData) setVerdict(calculateVerdict(weatherData, activeBoat, selectedDate));
+    if (weatherData) setVerdict(calculateVerdict(weatherData, activeBoat, selectedDate, tideData));
   }, [boats, activeBoatIndex]);
 
   const handleBoatsChange = async (next: (BoatSettings | null)[]) => {

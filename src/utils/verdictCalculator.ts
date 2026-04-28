@@ -1,15 +1,27 @@
-import { WeatherData, HourlyWeather, VerdictLevel, VerdictResult, BoatSettings, BOAT_DEFAULT } from '../types';
+import { WeatherData, HourlyWeather, VerdictLevel, VerdictResult, BoatSettings, BOAT_DEFAULT, TideData, TidePoint } from '../types';
 
-// Score 0–100 basé sur les seuils du voilier
+// Score 0–100 basé sur les seuils du voilier (+ hauteur d'eau optionnelle)
 export function computeScore(
   windSpeed: number,
   windGust: number,
   waveHeight: number,
-  boat: BoatSettings = BOAT_DEFAULT
+  boat: BoatSettings = BOAT_DEFAULT,
+  tideHeight?: number
 ): number {
   const windR = windSpeed / boat.maxWind;
   const gustR = windGust / (boat.maxWind * 1.3);
   const waveR = waveHeight / boat.maxWaves;
+
+  if (tideHeight !== undefined && tideHeight > 0) {
+    const draftR = boat.draft / tideHeight;
+    // Bateau échoué ou eau insuffisante → impossible
+    if (draftR >= 1.0) return 0;
+    // Normalise : marge de 15% = "à la limite" (équivalent windR=1.0)
+    const tideR = draftR / 0.85;
+    const worst = Math.max(windR, gustR, waveR, tideR);
+    return Math.round(Math.max(0, Math.min(100, 100 - 55 * Math.pow(worst, 1.5))));
+  }
+
   const worst = Math.max(windR, gustR, waveR);
   return Math.round(Math.max(0, Math.min(100, 100 - 55 * Math.pow(worst, 1.5))));
 }
@@ -34,14 +46,33 @@ export function assessConditions(
   return { wind, gust, wave, overall };
 }
 
+// Construit une map heure → hauteur d'eau à partir des points de marée
+function buildTideByHour(points: TidePoint[], dayPrefix: string): Record<number, number> {
+  const map: Record<number, number> = {};
+  for (const p of points) {
+    if (!p.time.startsWith(dayPrefix)) continue;
+    const timePart = p.time.split('T')[1] ?? '';
+    const hour = parseInt(timePart.slice(0, 2), 10);
+    if (!isNaN(hour)) map[hour] = p.height;
+  }
+  return map;
+}
+
 // Calcule les 24 scores horaires (un par heure 0h–23h)
-function buildHourlyScores(hourly: HourlyWeather[], dayPrefix: string, boat: BoatSettings): number[] {
+function buildHourlyScores(
+  hourly: HourlyWeather[],
+  dayPrefix: string,
+  boat: BoatSettings,
+  tidePoints?: TidePoint[]
+): number[] {
   const dayData = hourly.filter(h => h.time.startsWith(dayPrefix));
-  // Crée un tableau indexé par heure
+  const tideByHour = tidePoints ? buildTideByHour(tidePoints, dayPrefix) : {};
   const byHour: Record<number, number> = {};
   for (const h of dayData) {
-    const hour = new Date(h.time).getHours();
-    byHour[hour] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat);
+    const timePart = h.time.split('T')[1] ?? '';
+    const hour = parseInt(timePart.slice(0, 2), 10);
+    const tideHeight = tideByHour[hour];
+    byHour[hour] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideHeight);
   }
   return Array.from({ length: 24 }, (_, i) => byHour[i] ?? 50);
 }
@@ -82,19 +113,29 @@ function findBestWindow(scores: number[]): { start: number; end: number } | null
 export function calculateVerdict(
   weather: WeatherData,
   boat: BoatSettings = BOAT_DEFAULT,
-  selectedDate: Date = new Date()
+  selectedDate: Date = new Date(),
+  tideData?: TideData | null
 ): VerdictResult {
   const y = selectedDate.getFullYear();
   const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
   const d = String(selectedDate.getDate()).padStart(2, '0');
   const dayPrefix = `${y}-${m}-${d}`;
-  const hourlyScores = buildHourlyScores(weather.hourly, dayPrefix, boat);
+  const hourlyScores = buildHourlyScores(weather.hourly, dayPrefix, boat, tideData?.points);
 
   const currentHour = new Date().getHours();
-  const score = hourlyScores[currentHour] ?? computeScore(weather.windSpeed, weather.windGust, weather.waveHeight, boat);
+  const currentTideHeight = tideData?.currentHeight;
+  const score = hourlyScores[currentHour]
+    ?? computeScore(weather.windSpeed, weather.windGust, weather.waveHeight, boat, currentTideHeight);
   const level = levelFromScore(score);
 
   const reasons: string[] = [];
+  if (currentTideHeight !== undefined && currentTideHeight > 0) {
+    const draftR = boat.draft / currentTideHeight;
+    if (draftR >= 1.0)
+      reasons.push(`Eau insuffisante : ${currentTideHeight.toFixed(1)} m (TE ${boat.draft} m)`);
+    else if (draftR >= 0.85)
+      reasons.push(`Faible hauteur d'eau : ${currentTideHeight.toFixed(1)} m (TE ${boat.draft} m)`);
+  }
   if (weather.windSpeed > boat.maxWind * 0.8)
     reasons.push(`Vent ${Math.round(weather.windSpeed)} nœuds (seuil ${boat.maxWind} kn)`);
   if (weather.windGust > boat.maxWind * 1.1)
