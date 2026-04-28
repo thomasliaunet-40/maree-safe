@@ -205,9 +205,9 @@ export default function HomeScreen({
           <Text style={styles.portName}>{port.name}</Text>
           <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
         </TouchableOpacity>
-        <View style={styles.bellBtn}>
-          <Icon name="bell" size={18} stroke={COLORS.ink2} />
-        </View>
+        <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh} activeOpacity={0.7}>
+          <Icon name="refresh" size={18} stroke={COLORS.ink2} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
   topBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 6 },
   portBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
   portName: { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  bellBtn:  { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(14,23,38,0.05)', alignItems: 'center', justifyContent: 'center' },
+  refreshBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(14,23,38,0.05)', alignItems: 'center', justifyContent: 'center' },
 
   scroll:        { flex: 1 },
   scrollContent: { padding: 18, paddingBottom: 120 },

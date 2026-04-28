@@ -5,7 +5,7 @@ type IconName =
   | 'home' | 'calendar' | 'map' | 'wave' | 'settings'
   | 'location' | 'bell' | 'chevronRight' | 'chevronDown' | 'chevronLeft'
   | 'arrowUp' | 'arrowDown' | 'wind' | 'anchor' | 'search'
-  | 'star' | 'plus' | 'info' | 'check' | 'boat' | 'trash';
+  | 'star' | 'plus' | 'info' | 'check' | 'boat' | 'trash' | 'refresh';
 
 interface Props {
   name: IconName;
@@ -40,6 +40,7 @@ export default function Icon({ name, size = 20, stroke = 'currentColor', fill = 
     check: <><Path d="M5 12l4 4 10-10" {...props}/></>,
     boat:  <><Path d="M3 17l9-13 9 13" {...props}/><Path d="M3 17c2 2 4 2 6 0s4-2 6 0 4 2 6 0" {...props}/><Path d="M12 4v13" {...props}/></>,
     trash: <><Polyline points="3 6 5 6 21 6" {...props}/><Path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" {...props}/><Path d="M10 11v6M14 11v6" {...props}/><Path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" {...props}/></>,
+    refresh: <><Path d="M23 4v6h-6" {...props}/><Path d="M1 20v-6h6" {...props}/><Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...props}/></>,
   };
 
   return (

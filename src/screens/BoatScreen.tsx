@@ -269,6 +269,14 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
                 cardStyle={{ backgroundColor: COLORS.tide }}
                 valueStyle={{ color: COLORS.tideInk }}
               />
+              <TouchableOpacity
+                style={styles.validateBtn}
+                onPress={() => onNav('home')}
+                activeOpacity={0.85}
+              >
+                <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
+                <Text style={styles.validateTxt}>Valider les réglages</Text>
+              </TouchableOpacity>
             </>
           )}
         </ScrollView>
@@ -384,4 +392,11 @@ const styles = StyleSheet.create({
   sliderUnit:    { fontSize: 12, opacity: 0.6 },
   sliderRange:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   sliderRangeTxt:{ fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
+
+  validateBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, marginTop: 8, marginBottom: 4,
+    backgroundColor: COLORS.ink, borderRadius: 20, paddingVertical: 16,
+  },
+  validateTxt: { fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
 });
