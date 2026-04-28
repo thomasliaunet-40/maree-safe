@@ -24,6 +24,55 @@ interface Props {
   onNav: (s: Screen) => void;
 }
 
+function gaugeColor(ratio: number): string {
+  if (ratio >= 1.0) return COLORS.stop;
+  if (ratio >= 0.75) return COLORS.warn;
+  return COLORS.go;
+}
+
+function GaugeRow({ icon, iconColor, label, currentLabel, thresholdLabel, ratio }: {
+  icon: Parameters<typeof Icon>[0]['name'];
+  iconColor: string;
+  label: string;
+  currentLabel: string;
+  thresholdLabel: string;
+  ratio: number;
+}) {
+  const fill = Math.min(ratio, 1);
+  const color = gaugeColor(ratio);
+  return (
+    <View style={gaugeStyles.row}>
+      <View style={gaugeStyles.top}>
+        <View style={gaugeStyles.labelWrap}>
+          <Icon name={icon} size={13} stroke={iconColor} />
+          <Text style={gaugeStyles.label}>{label}</Text>
+        </View>
+        <View style={gaugeStyles.valueWrap}>
+          <Text style={[gaugeStyles.current, { color }]}>{currentLabel}</Text>
+          <Text style={gaugeStyles.separator}> / </Text>
+          <Text style={gaugeStyles.threshold}>{thresholdLabel}</Text>
+        </View>
+      </View>
+      <View style={gaugeStyles.barBg}>
+        <View style={[gaugeStyles.barFill, { width: `${fill * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+const gaugeStyles = StyleSheet.create({
+  row:       { paddingVertical: 12 },
+  top:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  labelWrap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  label:     { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  valueWrap: { flexDirection: 'row', alignItems: 'baseline' },
+  current:   { fontSize: 15, fontFamily: FONTS.display },
+  separator: { fontSize: 12, color: COLORS.ink4 },
+  threshold: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
+  barBg:     { height: 6, borderRadius: 3, backgroundColor: COLORS.hairline, overflow: 'hidden' },
+  barFill:   { height: 6, borderRadius: 3 },
+});
+
 function scoreColor(s: number) {
   if (s >= 75) return { bg: COLORS.go,    ink: COLORS.goInk };
   if (s >= 55) return { bg: '#d4edaa',    ink: '#3a5a1a' };
@@ -132,35 +181,44 @@ export default function HomeScreen({
               )}
             </View>
 
-            {/* Conditions vs mes seuils — masqué si aucun bateau configuré */}
-            {weatherData && boat !== null && (
-              <TouchableOpacity
-                style={styles.threshCard}
-                onPress={() => onNav('boat')}
-                activeOpacity={0.85}
-              >
-                <View style={styles.threshIcon}>
-                  <Icon name="boat" size={18} stroke={COLORS.ink2} />
+            {/* Jauges conditions vs seuils */}
+            {weatherData && (
+              <TouchableOpacity style={styles.gaugesCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
+                <View style={styles.gaugesHeader}>
+                  <Text style={styles.gaugesTitle}>Conditions vs mes seuils</Text>
+                  <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
                 </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={styles.threshLabel}>Conditions vs mes seuils</Text>
-                  <View style={styles.threshValues}>
-                    <Text style={styles.threshItem}>
-                      <Text style={styles.threshVal}>{Math.round(weatherData.windSpeed)}</Text>
-                      <Text style={[styles.threshMax, weatherData.windSpeed > boat.maxWind && styles.threshOver]}>
-                        {' '}/ {boat.maxWind} kn
-                      </Text>
-                    </Text>
-                    <Text style={styles.threshItem}>
-                      <Text style={styles.threshVal}>{weatherData.waveHeight.toFixed(1)}</Text>
-                      <Text style={[styles.threshMax, weatherData.waveHeight > boat.maxWaves && styles.threshOver]}>
-                        {' '}/ {boat.maxWaves} m
-                      </Text>
-                    </Text>
-                    <Text style={styles.threshDraft}>· {boat.draft}m TE</Text>
-                  </View>
-                </View>
-                <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
+
+                <GaugeRow
+                  icon="wind" iconColor={COLORS.sandInk}
+                  label="Vent"
+                  currentLabel={`${Math.round(weatherData.windSpeed)} kn`}
+                  thresholdLabel={`${boat.maxWind} kn max`}
+                  ratio={weatherData.windSpeed / boat.maxWind}
+                />
+
+                <View style={styles.gaugeDivider} />
+
+                <GaugeRow
+                  icon="wave" iconColor={COLORS.tideInk}
+                  label="Vagues"
+                  currentLabel={`${weatherData.waveHeight.toFixed(1)} m`}
+                  thresholdLabel={`${boat.maxWaves} m max`}
+                  ratio={weatherData.waveHeight / boat.maxWaves}
+                />
+
+                {tideData && tideData.currentHeight > 0 && (
+                  <>
+                    <View style={styles.gaugeDivider} />
+                    <GaugeRow
+                      icon="anchor" iconColor={COLORS.lilacInk}
+                      label="Hauteur d'eau"
+                      currentLabel={`${tideData.currentHeight.toFixed(1)} m`}
+                      thresholdLabel={`TE ${boat.draft} m`}
+                      ratio={boat.draft / tideData.currentHeight}
+                    />
+                  </>
+                )}
               </TouchableOpacity>
             )}
 
@@ -320,16 +378,11 @@ const styles = StyleSheet.create({
   windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
 
-  // Conditions vs seuils
-  threshCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: COLORS.hairline },
-  threshIcon:   { width: 42, height: 42, borderRadius: 13, backgroundColor: COLORS.paperSoft, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  threshLabel:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3, marginBottom: 6 },
-  threshValues: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
-  threshItem:   { fontSize: 13 },
-  threshVal:    { fontSize: 15, fontFamily: FONTS.display, fontWeight: '600', color: COLORS.ink },
-  threshMax:    { fontSize: 11, color: COLORS.ink3 },
-  threshOver:   { color: COLORS.stopDeep },
-  threshDraft:  { fontSize: 12, color: COLORS.ink3 },
+  // Jauges
+  gaugesCard:    { backgroundColor: COLORS.paper, borderRadius: 28, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
+  gaugesHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  gaugesTitle:   { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
+  gaugeDivider:  { height: 1, backgroundColor: COLORS.hairline },
 
   // KPI row
   kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
