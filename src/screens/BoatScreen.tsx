@@ -2,7 +2,7 @@ import React, { useRef, useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   useWindowDimensions, NativeScrollEvent, NativeSyntheticEvent,
-  Alert, TextInput, KeyboardAvoidingView, Platform,
+  TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Svg, { Path, Line } from 'react-native-svg';
@@ -31,6 +31,9 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
   const [formName, setFormName] = useState('');
   const [formDraft, setFormDraft] = useState(1.8);
 
+  // Confirmation de suppression inline
+  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
+
   const openCreation = (index: number) => {
     setFormName('');
     setFormDraft(1.8);
@@ -51,17 +54,11 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
     setCreatingIndex(null);
   };
 
-  const removeBoat = (index: number) => {
-    Alert.alert('Supprimer ce bateau ?', 'Les réglages seront perdus.', [
-      { text: 'Annuler', style: 'cancel' },
-      {
-        text: 'Supprimer', style: 'destructive', onPress: () => {
-          const next = [...boats] as (BoatSettings | null)[];
-          next[index] = null;
-          onBoatsChange(next);
-        },
-      },
-    ]);
+  const confirmDelete = (index: number) => {
+    const next = [...boats] as (BoatSettings | null)[];
+    next[index] = null;
+    onBoatsChange(next);
+    setConfirmDeleteIndex(null);
   };
 
   const updateBoat = (index: number, key: keyof BoatSettings, value: any) => {
@@ -117,13 +114,40 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
                 return (
                   <View key={i} style={{ width: screenWidth, paddingHorizontal: 18 }}>
 
+                    {/* Confirmation de suppression */}
+                    {boat && !creating && confirmDeleteIndex === i && (
+                      <View style={styles.heroCard}>
+                        <Text style={styles.heroTag}>Supprimer ce bateau ?</Text>
+                        <Text style={styles.heroName}>{boat.name}</Text>
+                        <Text style={styles.deleteWarning}>
+                          Cette action est irréversible. Tous les réglages seront perdus.
+                        </Text>
+                        <View style={styles.formActions}>
+                          <TouchableOpacity
+                            style={styles.cancelBtn}
+                            onPress={() => setConfirmDeleteIndex(null)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.cancelTxt}>Annuler</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.deleteBtn}
+                            onPress={() => confirmDelete(i)}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={styles.confirmTxt}>Supprimer</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
                     {/* Slot rempli */}
-                    {boat && !creating && (
+                    {boat && !creating && confirmDeleteIndex !== i && (
                       <View style={styles.heroCard}>
                         <View style={styles.heroHeader}>
                           <Text style={styles.heroTag}>Bateau {i + 1}</Text>
                           <TouchableOpacity
-                            onPress={() => removeBoat(i)}
+                            onPress={() => setConfirmDeleteIndex(i)}
                             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                           >
                             <Icon name="trash" size={16} stroke="rgba(255,255,255,0.45)" />
@@ -327,8 +351,10 @@ const styles = StyleSheet.create({
   formActions:{ flexDirection: 'row', gap: 10, marginTop: 18 },
   cancelBtn:  { flex: 1, paddingVertical: 11, borderRadius: 14, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   cancelTxt:  { fontSize: 14, fontFamily: FONTS.semiBold, color: 'rgba(255,255,255,0.55)' },
-  confirmBtn: { flex: 2, paddingVertical: 11, borderRadius: 14, alignItems: 'center', backgroundColor: COLORS.brand },
-  confirmTxt: { fontSize: 14, fontFamily: FONTS.semiBold, color: '#fff' },
+  confirmBtn:    { flex: 2, paddingVertical: 11, borderRadius: 14, alignItems: 'center', backgroundColor: COLORS.brand },
+  confirmTxt:    { fontSize: 14, fontFamily: FONTS.semiBold, color: '#fff' },
+  deleteBtn:     { flex: 2, paddingVertical: 11, borderRadius: 14, alignItems: 'center', backgroundColor: COLORS.stop },
+  deleteWarning: { fontSize: 13, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.55)', marginTop: 10, marginBottom: 4, lineHeight: 18 },
 
   // Hero card vide
   heroCardEmpty: {
