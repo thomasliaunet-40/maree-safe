@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Port } from '../types';
 import { ALL_PORTS } from '../constants/ports';
@@ -7,8 +7,7 @@ import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
-
-const FAVORITES = ['boucau-bayonne-biarritz', 'lorient', 'concarneau', 'la-rochelle', 'saint-malo'];
+import { loadFavoritePortIds, saveFavoritePortIds } from '../services/storageService';
 
 interface Props {
   selectedPort: Port;
@@ -18,17 +17,30 @@ interface Props {
 
 export default function PortsScreen({ selectedPort, onSelect, onNav }: Props) {
   const [query, setQuery] = useState('');
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadFavoritePortIds().then(setFavorites);
+  }, []);
+
+  const toggleFavorite = async (id: string) => {
+    const next = favorites.includes(id)
+      ? favorites.filter(f => f !== id)
+      : [...favorites, id];
+    setFavorites(next);
+    await saveFavoritePortIds(next);
+  };
 
   const filtered = ALL_PORTS.filter(p =>
     p.name.toLowerCase().includes(query.toLowerCase()) ||
     p.region.toLowerCase().includes(query.toLowerCase())
   );
-  const favs   = filtered.filter(p => FAVORITES.includes(p.id));
-  const others = filtered.filter(p => !FAVORITES.includes(p.id));
+  const favs   = filtered.filter(p => favorites.includes(p.id));
+  const others = filtered.filter(p => !favorites.includes(p.id));
 
   const PortRow = ({ p }: { p: Port }) => {
     const selected = p.id === selectedPort.id;
-    const isFav = FAVORITES.includes(p.id);
+    const isFav = favorites.includes(p.id);
     return (
       <TouchableOpacity
         style={[styles.portRow, selected && styles.portRowSelected]}
@@ -44,7 +56,18 @@ export default function PortsScreen({ selectedPort, onSelect, onNav }: Props) {
           <Text style={[styles.portName, selected && styles.portNameSelected]}>{p.name}</Text>
           <Text style={[styles.portRegion, selected && styles.portRegionSelected]}>{p.region}</Text>
         </View>
-        {isFav && <Icon name="star" size={16} fill={COLORS.warn} stroke={COLORS.warn} />}
+        <TouchableOpacity
+          onPress={() => toggleFavorite(p.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.6}
+        >
+          <Icon
+            name="star"
+            size={18}
+            fill={isFav ? COLORS.warn : 'none'}
+            stroke={isFav ? COLORS.warn : (selected ? 'rgba(255,255,255,0.4)' : COLORS.ink4)}
+          />
+        </TouchableOpacity>
         {selected && (
           <View style={styles.checkBadge}>
             <Icon name="check" size={14} stroke="#fff" strokeWidth={2.5} />
