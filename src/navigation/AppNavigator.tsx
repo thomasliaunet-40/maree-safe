@@ -151,6 +151,7 @@ export default function AppNavigator() {
           boat={activeBoat}
           selectedDate={selectedDate}
           isToday={isToday}
+          onRefresh={() => loadData(port, apiKey, selectedDate, activeBoat)}
           {...commonProps}
         />
       )}

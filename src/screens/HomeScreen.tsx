@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
@@ -23,6 +23,7 @@ interface Props {
   selectedDate: Date;
   isToday: boolean;
   onNav: (s: Screen) => void;
+  onRefresh: () => void;
 }
 
 const COND_PALETTE = {
@@ -133,7 +134,7 @@ const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
 
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
-  boat, selectedDate, isToday, onNav,
+  boat, selectedDate, isToday, onNav, onRefresh,
 }: Props) {
   const nowRef = useRef(new Date());
   const now = nowRef.current;
@@ -213,6 +214,9 @@ export default function HomeScreen({
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={COLORS.brand} />
+        }
       >
         {/* Greeting */}
         <View style={styles.greeting}>
