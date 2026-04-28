@@ -24,41 +24,56 @@ interface Props {
   onNav: (s: Screen) => void;
 }
 
-const BADGE_PALETTE = {
+const COND_PALETTE = {
   green:  { bg: COLORS.go,   fg: COLORS.goInk },
   orange: { bg: COLORS.warn, fg: '#7a3d18'    },
   red:    { bg: COLORS.stop, fg: '#fff'        },
 };
 
-function badgeLevel(ratio: number): keyof typeof BADGE_PALETTE {
+function condLevel(ratio: number): keyof typeof COND_PALETTE {
   if (ratio >= 1.0) return 'red';
   if (ratio >= 0.75) return 'orange';
   return 'green';
 }
 
-function ConditionBadge({ icon, label, value, sub, ratio }: {
+function ConditionBar({ icon, label, value, sub, ratio }: {
   icon: Parameters<typeof Icon>[0]['name'];
   label: string;
   value: string;
   sub: string;
   ratio: number;
 }) {
-  const { bg, fg } = BADGE_PALETTE[badgeLevel(ratio)];
+  const { bg, fg } = COND_PALETTE[condLevel(ratio)];
+  const fill = Math.min(ratio, 1);
   return (
-    <View style={[badgeStyles.card, { backgroundColor: bg }]}>
-      <Icon name={icon} size={15} stroke={fg} />
-      <Text style={[badgeStyles.value, { color: fg }]}>{value}</Text>
-      <Text style={[badgeStyles.label, { color: fg }]}>{label}</Text>
-      <Text style={[badgeStyles.sub, { color: fg }]}>{sub}</Text>
+    <View style={[barStyles.card, { backgroundColor: bg }]}>
+      <View style={barStyles.top}>
+        <View style={barStyles.labelRow}>
+          <Icon name={icon} size={14} stroke={fg} />
+          <Text style={[barStyles.label, { color: fg }]}>{label}</Text>
+        </View>
+        <View style={barStyles.valueRow}>
+          <Text style={[barStyles.value, { color: fg }]}>{value}</Text>
+          <Text style={[barStyles.sub, { color: fg }]}> / {sub}</Text>
+        </View>
+      </View>
+      <View style={barStyles.track}>
+        <View style={[barStyles.fill, { width: `${fill * 100}%` }]} />
+      </View>
     </View>
   );
 }
 
-const badgeStyles = StyleSheet.create({
-  card:  { flex: 1, borderRadius: 20, paddingVertical: 14, paddingHorizontal: 10, alignItems: 'center', gap: 3 },
-  value: { fontSize: 19, fontFamily: FONTS.display, lineHeight: 22, marginTop: 4 },
-  label: { fontSize: 11, fontFamily: FONTS.semiBold, textTransform: 'uppercase', letterSpacing: 0.1 },
-  sub:   { fontSize: 10, fontFamily: FONTS.regular, opacity: 0.7 },
+const barStyles = StyleSheet.create({
+  card:     { borderRadius: 18, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 10 },
+  top:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  label:    { fontSize: 13, fontFamily: FONTS.semiBold },
+  valueRow: { flexDirection: 'row', alignItems: 'baseline' },
+  value:    { fontSize: 15, fontFamily: FONTS.display },
+  sub:      { fontSize: 11, fontFamily: FONTS.regular, opacity: 0.65 },
+  track:    { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.12)', overflow: 'hidden' },
+  fill:     { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.28)' },
 });
 
 function scoreColor(s: number) {
@@ -231,40 +246,27 @@ export default function HomeScreen({
               ) : null; })()}
             </View>
 
-            {/* Conditions vs seuils — vignettes colorées */}
-            {weatherData && (
-              <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
-                <View style={styles.condHeader}>
-                  <Text style={styles.condTitle}>Conditions vs mes seuils</Text>
-                  <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
-                </View>
-                <View style={styles.condRow}>
-                  <ConditionBadge
-                    icon="wind"
-                    label="Vent"
-                    value={`${Math.round(displayWind)} kn`}
-                    sub={`max ${boat.maxWind} kn`}
-                    ratio={displayWind / boat.maxWind}
-                  />
-                  <ConditionBadge
-                    icon="wave"
-                    label="Vagues"
-                    value={`${displayWaveH.toFixed(1)} m`}
-                    sub={`max ${boat.maxWaves} m`}
-                    ratio={displayWaveH / boat.maxWaves}
-                  />
-                  {displayTideH > 0 && (
-                    <ConditionBadge
-                      icon="anchor"
-                      label="Hauteur"
-                      value={`${displayTideH.toFixed(1)} m`}
-                      sub={`TE ${boat.draft} m`}
-                      ratio={boat.draft / displayTideH}
-                    />
-                  )}
-                </View>
-              </TouchableOpacity>
-            )}
+            {/* Conditions vs seuils — barres pleine largeur, triées par sévérité */}
+            {weatherData && (() => {
+              const conditions = [
+                { icon: 'wind'   as const, label: 'Vent',         value: `${Math.round(displayWind)} kn`,    sub: `max ${boat.maxWind} kn`,   ratio: displayWind / boat.maxWind },
+                { icon: 'wave'   as const, label: 'Vagues',       value: `${displayWaveH.toFixed(1)} m`,     sub: `max ${boat.maxWaves} m`,   ratio: displayWaveH / boat.maxWaves },
+                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH }] : []),
+              ].sort((a, b) => b.ratio - a.ratio);
+              return (
+                <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
+                  <View style={styles.condHeader}>
+                    <Text style={styles.condTitle}>Conditions vs mes seuils</Text>
+                    <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
+                  </View>
+                  <View style={styles.condRows}>
+                    {conditions.map(c => (
+                      <ConditionBar key={c.label} {...c} />
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
 
             {/* 3 KPI cards */}
             {weatherData && (
@@ -427,7 +429,7 @@ const styles = StyleSheet.create({
   condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
   condHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   condTitle:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
-  condRow:    { flexDirection: 'row', gap: 8 },
+  condRows:   { gap: 6 },
 
   // KPI row
   kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
