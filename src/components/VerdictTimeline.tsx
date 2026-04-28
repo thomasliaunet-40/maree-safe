@@ -29,11 +29,13 @@ export default function VerdictTimeline({ hourlyScores, currentHour, onHourChang
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (evt) => {
         const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
-        onHourChange?.(Math.min(23, Math.max(0, Math.round((x / barWidth) * 23.99))));
+        const raw = (x / barWidth) * 24;
+        onHourChange?.(Math.min(23.5, Math.max(0, Math.round(raw * 2) / 2)));
       },
       onPanResponderMove: (evt) => {
         const x = Math.max(0, Math.min(barWidth, evt.nativeEvent.locationX));
-        onHourChange?.(Math.min(23, Math.max(0, Math.round((x / barWidth) * 23.99))));
+        const raw = (x / barWidth) * 24;
+        onHourChange?.(Math.min(23.5, Math.max(0, Math.round(raw * 2) / 2)));
       },
     })
   ).current;

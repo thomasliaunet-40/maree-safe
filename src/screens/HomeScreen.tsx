@@ -76,6 +76,12 @@ function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): H
   return hourly.find(h => h.time.startsWith(prefix)) ?? null;
 }
 
+function formatScrubHour(h: number): string {
+  const whole = Math.floor(h);
+  const mins = h % 1 >= 0.5 ? '30' : '00';
+  return `${String(whole).padStart(2, '0')}h${mins}`;
+}
+
 function findTideHeight(points: TideData['points'], hour: number, date: Date): number | null {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -95,18 +101,19 @@ export default function HomeScreen({
   useEffect(() => { setScrubHour(null); }, [selectedDate]);
 
   const displayHour = scrubHour ?? (isToday ? hour : 12);
-  const displayScore = verdict?.hourlyScores[displayHour] ?? verdict?.score ?? 0;
+  const displayHourInt = Math.min(23, Math.round(displayHour));
+  const displayScore = verdict?.hourlyScores[displayHourInt] ?? verdict?.score ?? 0;
   const { bg, ink } = scoreColor(displayScore);
 
   // Données météo et marée à l'heure affichée
   const hourlyW = scrubHour !== null && weatherData
-    ? findHourlyWeather(weatherData.hourly, displayHour, selectedDate)
+    ? findHourlyWeather(weatherData.hourly, Math.floor(displayHour), selectedDate)
     : null;
   const displayWind      = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
   const displayGust      = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
   const displayWaveH     = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
   const displayTideH     = scrubHour !== null && tideData
-    ? (findTideHeight(tideData.points, displayHour, selectedDate) ?? tideData.currentHeight)
+    ? (findTideHeight(tideData.points, Math.floor(displayHour), selectedDate) ?? tideData.currentHeight)
     : tideData?.currentHeight ?? 0;
 
   const isScrubbing = scrubHour !== null;
@@ -162,13 +169,18 @@ export default function HomeScreen({
           <>
             {/* Verdict card */}
             <View style={[styles.verdictCard, { backgroundColor: bg }]}>
-              <Text style={[styles.verdictTime, { color: ink }]}>
-                {isScrubbing
-                  ? `→ ${String(displayHour).padStart(2, '0')}h00`
-                  : isToday
-                  ? `Maintenant · ${String(hour).padStart(2, '0')}:00`
-                  : dateLabel}
-              </Text>
+              <TouchableOpacity
+                onPress={() => isScrubbing ? setScrubHour(null) : undefined}
+                activeOpacity={isScrubbing ? 0.6 : 1}
+              >
+                <Text style={[styles.verdictTime, { color: ink }]}>
+                  {isScrubbing
+                    ? `→ ${formatScrubHour(displayHour)}`
+                    : isToday
+                    ? `Maintenant · ${String(hour).padStart(2, '0')}:00`
+                    : dateLabel}
+                </Text>
+              </TouchableOpacity>
               <Text style={[styles.verdictTitle, { color: ink }]} numberOfLines={1}>
                 Conditions de navigation
               </Text>
@@ -180,15 +192,6 @@ export default function HomeScreen({
                   currentHour={displayHour}
                   onHourChange={setScrubHour}
                 />
-                {isScrubbing && isToday && (
-                  <TouchableOpacity
-                    style={[styles.nowChip, { borderColor: `${ink}40` }]}
-                    onPress={() => setScrubHour(null)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.nowChipText, { color: ink }]}>← Maintenant</Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
               {/* Coefficient de l'étale suivante */}
@@ -414,10 +417,6 @@ const styles = StyleSheet.create({
   windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
   windowSep:    { marginTop: 4 },
-
-  // Chip retour à maintenant
-  nowChip:     { alignSelf: 'center', marginTop: 10, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  nowChipText: { fontSize: 11, fontFamily: FONTS.semiBold },
 
   // Conditions vs seuils
   condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
