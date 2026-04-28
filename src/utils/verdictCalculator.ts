@@ -84,7 +84,10 @@ export function calculateVerdict(
   boat: BoatSettings = BOAT_DEFAULT,
   selectedDate: Date = new Date()
 ): VerdictResult {
-  const dayPrefix = selectedDate.toISOString().slice(0, 10);
+  const y = selectedDate.getFullYear();
+  const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+  const d = String(selectedDate.getDate()).padStart(2, '0');
+  const dayPrefix = `${y}-${m}-${d}`;
   const hourlyScores = buildHourlyScores(weather.hourly, dayPrefix, boat);
 
   const currentHour = new Date().getHours();

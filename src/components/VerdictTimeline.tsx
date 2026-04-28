@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Defs, LinearGradient, Stop, Rect, Line, Rect as SvgRect } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Stop, Rect, Line, Path } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
 import { COLORS } from '../constants/colors';
 
@@ -12,18 +12,24 @@ function scoreToColor(s: number): string {
 }
 
 interface Props {
-  hourlyScores: number[];            // 24 valeurs
+  hourlyScores: number[];
   recommendedWindow: { start: number; end: number } | null;
   currentHour: number;
 }
 
 export default function VerdictTimeline({ hourlyScores, recommendedWindow, currentHour }: Props) {
   const W = 320;
-  const H = 56;
-
+  const H = 84;
   const nowPct = (currentHour / 24) * 100;
-  const winLeftPct  = recommendedWindow ? (recommendedWindow.start / 24) * 100 : null;
-  const winWidthPct = recommendedWindow ? ((recommendedWindow.end - recommendedWindow.start + 1) / 24) * 100 : null;
+
+  // Courbe sinusoïdale symbolique : 2 cycles sur 24h, légèrement décalés
+  const tidePts: string[] = [];
+  for (let i = 0; i <= 48; i++) {
+    const x = (i / 48) * W;
+    const y = H / 2 - Math.sin((i / 48 * 4 * Math.PI) - Math.PI / 3) * (H * 0.32);
+    tidePts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  const tidePath = 'M ' + tidePts.join(' L ');
 
   return (
     <View>
@@ -43,19 +49,16 @@ export default function VerdictTimeline({ hourlyScores, recommendedWindow, curre
             return <Rect key={i} x={x} y={0} width={w + 0.5} height={H} fill={`url(#g${i})`} />;
           })}
 
-          {/* Fenêtre recommandée */}
-          {winLeftPct !== null && winWidthPct !== null && (
-            <Rect
-              x={(winLeftPct / 100) * W}
-              y={1}
-              width={(winWidthPct / 100) * W}
-              height={H - 2}
-              fill="none"
-              stroke={COLORS.ink}
-              strokeWidth={2.5}
-              rx={14}
-            />
-          )}
+          {/* Courbe symbolique de marée */}
+          <Path
+            d={tidePath}
+            fill="none"
+            stroke="rgba(255,255,255,0.85)"
+            strokeWidth={1.5}
+            vectorEffect="non-scaling-stroke"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
 
           {/* Curseur maintenant */}
           <Line
@@ -79,8 +82,8 @@ export default function VerdictTimeline({ hourlyScores, recommendedWindow, curre
 
 const styles = StyleSheet.create({
   bar: {
-    height: 56,
-    borderRadius: 16,
+    height: 84,
+    borderRadius: 18,
     overflow: 'hidden',
   },
   ticks: {

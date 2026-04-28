@@ -5,7 +5,8 @@ import { ALL_PORTS } from '../constants/ports';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
-import FabNav, { Screen } from '../components/FabNav';
+import NavFade from '../components/NavFade';
+import { Screen } from '../components/FabNav';
 
 const FAVORITES = ['boucau-bayonne-biarritz', 'lorient', 'concarneau', 'la-rochelle', 'saint-malo'];
 
@@ -103,7 +104,7 @@ export default function PortsScreen({ selectedPort, onSelect, onNav }: Props) {
         )}
       </ScrollView>
 
-      <FabNav active="ports" onChange={onNav} />
+      <NavFade active="ports" onChange={onNav} />
     </View>
   );
 }

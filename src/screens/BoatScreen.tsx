@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import Slider from '@react-native-community/slider';
 import Svg, { Path, Line } from 'react-native-svg';
-import { BoatSettings, BOAT_TYPES } from '../types';
+import { BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
-import FabNav, { Screen } from '../components/FabNav';
+import NavFade, { Screen } from '../components/NavFade';
 
 interface Props {
   boat: BoatSettings;
@@ -33,12 +33,8 @@ export default function BoatScreen({ boat, onChange, onNav }: Props) {
         {/* Hero card */}
         <View style={styles.heroCard}>
           <Text style={styles.heroTag}>Mon bateau</Text>
-          <Text style={styles.heroLength}>
-            {boat.length}<Text style={styles.heroUnit}> m</Text>
-          </Text>
-          <Text style={styles.heroSub}>
-            {BOAT_TYPES.find(t => t.id === boat.type)?.label ?? ''} · {boat.experience}
-          </Text>
+          <Text style={styles.heroName}>Voilier</Text>
+          <Text style={styles.heroSub}>Voilier · {boat.draft}m TE</Text>
           {/* Silhouette SVG */}
           <View style={{ marginTop: 18, alignItems: 'center' }}>
             <Svg width={200} height={80} viewBox="0 0 200 80">
@@ -51,36 +47,8 @@ export default function BoatScreen({ boat, onChange, onNav }: Props) {
           </View>
         </View>
 
-        {/* Type de voilier */}
-        <Text style={styles.sectionLabel}>Type de voilier</Text>
-        <View style={styles.typeGrid}>
-          {BOAT_TYPES.map(t => {
-            const sel = t.id === boat.type;
-            return (
-              <TouchableOpacity
-                key={t.id}
-                style={[styles.typeCard, sel && styles.typeCardSelected]}
-                onPress={() => update('type', t.id)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.typeLabel, sel && styles.typeLabelSelected]}>{t.label}</Text>
-                <Text style={[styles.typeSub, sel && styles.typeSubSelected]}>{t.subtitle}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
         {/* Caractéristiques */}
         <Text style={styles.sectionLabel}>Caractéristiques</Text>
-        <SliderCard
-          label="Longueur"
-          value={boat.length}
-          min={3} max={20} step={0.5}
-          unit="m"
-          onChange={v => update('length', v)}
-          rangeMin="3 m" rangeMax="20 m"
-          accentColor={COLORS.brand}
-        />
         <SliderCard
           label="Tirant d'eau"
           value={boat.draft}
@@ -117,27 +85,9 @@ export default function BoatScreen({ boat, onChange, onNav }: Props) {
           cardStyle={{ backgroundColor: COLORS.tide }}
           valueStyle={{ color: COLORS.tideInk }}
         />
-
-        {/* Expérience */}
-        <Text style={styles.sectionLabel}>Niveau d'expérience</Text>
-        <View style={styles.expRow}>
-          {(['Débutant', 'Confirmé', 'Expert'] as const).map(lvl => {
-            const sel = boat.experience === lvl;
-            return (
-              <TouchableOpacity
-                key={lvl}
-                style={[styles.expBtn, sel && styles.expBtnSelected]}
-                onPress={() => update('experience', lvl)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.expTxt, sel && styles.expTxtSelected]}>{lvl}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </ScrollView>
 
-      <FabNav active="boat" onChange={onNav} />
+      <NavFade active="boat" onChange={onNav} />
     </View>
   );
 }
@@ -197,19 +147,10 @@ const styles = StyleSheet.create({
 
   heroCard: { backgroundColor: COLORS.ink, borderRadius: 28, padding: 20, marginBottom: 22 },
   heroTag:  { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONTS.semiBold, letterSpacing: 0.12, textTransform: 'uppercase' },
-  heroLength:{ fontSize: 32, fontFamily: FONTS.display, color: '#fff', marginTop: 8, lineHeight: 34 },
-  heroUnit: { fontSize: 16, opacity: 0.6 },
+  heroName: { fontSize: 32, fontFamily: FONTS.display, color: '#fff', marginTop: 8, lineHeight: 36 },
   heroSub:  { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontFamily: FONTS.regular, marginTop: 4 },
 
   sectionLabel: { fontSize: 11, fontFamily: FONTS.semiBold, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 0.12, marginBottom: 12 },
-
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 22 },
-  typeCard: { width: '48%', padding: 14, borderRadius: 18, backgroundColor: COLORS.paper, borderWidth: 1, borderColor: COLORS.hairline },
-  typeCardSelected: { backgroundColor: COLORS.ink, borderColor: COLORS.ink },
-  typeLabel:{ fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  typeLabelSelected:{ color: '#fff' },
-  typeSub:  { fontSize: 11, fontFamily: FONTS.regular, color: COLORS.ink3, marginTop: 4 },
-  typeSubSelected:{ color: 'rgba(255,255,255,0.65)' },
 
   sliderCard:  { backgroundColor: COLORS.paper, borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: COLORS.hairline },
   sliderTop:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 },
@@ -219,10 +160,4 @@ const styles = StyleSheet.create({
   sliderUnit:  { fontSize: 12, opacity: 0.6 },
   sliderRange: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   sliderRangeTxt:{ fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
-
-  expRow: { flexDirection: 'row', gap: 8, marginBottom: 22 },
-  expBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, alignItems: 'center', backgroundColor: COLORS.paper, borderWidth: 1, borderColor: COLORS.hairline },
-  expBtnSelected:{ backgroundColor: COLORS.brand, borderColor: COLORS.brand },
-  expTxt: { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  expTxtSelected:{ color: '#fff' },
 });

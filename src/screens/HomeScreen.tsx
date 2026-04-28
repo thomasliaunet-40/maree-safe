@@ -5,7 +5,8 @@ import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import { degreesToCompass } from '../utils/windDirection';
 import Icon from '../components/Icon';
-import FabNav, { Screen } from '../components/FabNav';
+import NavFade from '../components/NavFade';
+import { Screen } from '../components/FabNav';
 import VerdictTimeline from '../components/VerdictTimeline';
 import Compass from '../components/Compass';
 
@@ -24,8 +25,8 @@ interface Props {
 }
 
 function scoreColor(s: number) {
-  if (s >= 75) return { bg: COLORS.go,   ink: COLORS.goInk };
-  if (s >= 55) return { bg: '#d4edaa',   ink: '#3a5a1a' };
+  if (s >= 75) return { bg: COLORS.go,    ink: COLORS.goInk };
+  if (s >= 55) return { bg: '#d4edaa',    ink: '#3a5a1a' };
   if (s >= 35) return { bg: COLORS.warn,  ink: '#7a3d18' };
   return           { bg: COLORS.stop,     ink: '#fff' };
 }
@@ -76,7 +77,7 @@ export default function HomeScreen({
           <Text style={styles.greetingDate}>{dateLabel}</Text>
           <Text style={styles.greetingTitle}>
             {'Bonjour Marin,\n'}
-            <Text style={styles.greetingMuted}>la mer vous attend.</Text>
+            <Text style={styles.greetingMuted}></Text>
           </Text>
         </View>
 
@@ -88,24 +89,16 @@ export default function HomeScreen({
         ) : verdict ? (
           <>
             {/* Verdict card */}
-            <TouchableOpacity
-              style={[styles.verdictCard, { backgroundColor: bg }]}
-              activeOpacity={0.95}
-            >
-              {/* Score badge */}
-              <View style={styles.scoreBadge}>
-                <View style={[styles.scoreDot, { backgroundColor: ink }]} />
-                <Text style={[styles.scoreTxt, { color: ink }]}>{score}/100</Text>
-              </View>
-
+            <View style={[styles.verdictCard, { backgroundColor: bg }]}>
               <Text style={[styles.verdictTime, { color: ink }]}>
                 {isToday ? `Maintenant · ${String(hour).padStart(2, '0')}:00` : dateLabel}
               </Text>
-              <Text style={[styles.verdictTitle, { color: ink }]}>{verdict.title}</Text>
-              <Text style={[styles.verdictSub, { color: ink }]}>{verdict.subtitle}</Text>
+              <Text style={[styles.verdictTitle, { color: ink }]} numberOfLines={1}>
+                Conditions de navigation
+              </Text>
 
               {/* Timeline */}
-              <View style={{ marginTop: 16 }}>
+              <View style={{ marginTop: 20 }}>
                 <VerdictTimeline
                   hourlyScores={verdict.hourlyScores}
                   recommendedWindow={verdict.recommendedWindow}
@@ -113,24 +106,63 @@ export default function HomeScreen({
                 />
               </View>
 
+              {/* Coefficient de l'étale suivante */}
+              {tideData?.coefficient != null && (
+                <Text style={[styles.coefLine, { color: ink }]}>
+                  COEFF : {tideData.coefficient}
+                </Text>
+              )}
+
               {/* Fenêtre recommandée */}
               {verdict.recommendedWindow && (
                 <View style={styles.windowRow}>
-                  <View style={styles.windowIcon}>
+                  <View style={[styles.windowIcon, { backgroundColor: `${ink}CC` }]}>
                     <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.windowLabel, { color: ink }]}>Fenêtre recommandée</Text>
+                    <Text style={[styles.windowLabel, { color: ink }]}>FENÊTRE OPTIMALE</Text>
                     <Text style={[styles.windowTime, { color: ink }]}>
                       {verdict.recommendedWindow.start}h00 — {verdict.recommendedWindow.end}h00
-                      <Text style={{ fontFamily: FONTS.regular, opacity: 0.65 }}>
-                        {' '}· {verdict.recommendedWindow.end - verdict.recommendedWindow.start + 1}h
+                      <Text style={[styles.windowDur, { color: ink }]}>
+                        {' '}· {verdict.recommendedWindow.end - verdict.recommendedWindow.start}h
                       </Text>
                     </Text>
                   </View>
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
+
+            {/* Conditions vs mes seuils */}
+            {weatherData && (
+              <TouchableOpacity
+                style={styles.threshCard}
+                onPress={() => onNav('boat')}
+                activeOpacity={0.85}
+              >
+                <View style={styles.threshIcon}>
+                  <Icon name="boat" size={18} stroke={COLORS.ink2} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.threshLabel}>Conditions vs mes seuils</Text>
+                  <View style={styles.threshValues}>
+                    <Text style={styles.threshItem}>
+                      <Text style={styles.threshVal}>{Math.round(weatherData.windSpeed)}</Text>
+                      <Text style={[styles.threshMax, weatherData.windSpeed > boat.maxWind && styles.threshOver]}>
+                        {' '}/ {boat.maxWind} kn
+                      </Text>
+                    </Text>
+                    <Text style={styles.threshItem}>
+                      <Text style={styles.threshVal}>{weatherData.waveHeight.toFixed(1)}</Text>
+                      <Text style={[styles.threshMax, weatherData.waveHeight > boat.maxWaves && styles.threshOver]}>
+                        {' '}/ {boat.maxWaves} m
+                      </Text>
+                    </Text>
+                    <Text style={styles.threshDraft}>· {boat.draft}m TE</Text>
+                  </View>
+                </View>
+                <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
+              </TouchableOpacity>
+            )}
 
             {/* 3 KPI cards */}
             {weatherData && (
@@ -241,11 +273,7 @@ export default function HomeScreen({
                 <Icon name="boat" size={18} stroke={COLORS.ink2} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.boatTitle}>{boat.length} m · {
-                  boat.type === 'derive' ? 'Dériveur'
-                  : boat.type === 'voilier-quillard' ? 'Voilier quillard'
-                  : boat.type === 'cata' ? 'Catamaran' : 'Voilier hauturier'
-                }</Text>
+                <Text style={styles.boatTitle}>Mon voilier</Text>
                 <Text style={styles.boatSub}>Seuils : {boat.maxWind} kn · {boat.maxWaves} m</Text>
               </View>
               <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
@@ -258,7 +286,7 @@ export default function HomeScreen({
         ) : null}
       </ScrollView>
 
-      <FabNav active="home" onChange={onNav} />
+      <NavFade active="home" onChange={onNav} />
     </View>
   );
 }
@@ -282,17 +310,26 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, fontFamily: FONTS.regular, color: COLORS.ink3 },
 
   // Verdict
-  verdictCard:  { borderRadius: 28, padding: 22, marginBottom: 14, position: 'relative' },
-  scoreBadge:   { position: 'absolute', top: 18, right: 18, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.55)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  scoreDot:     { width: 6, height: 6, borderRadius: 3 },
-  scoreTxt:     { fontSize: 11, fontFamily: FONTS.bold },
-  verdictTime:  { fontSize: 11, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', opacity: 0.7, marginBottom: 6 },
-  verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, marginBottom: 6 },
-  verdictSub:   { fontSize: 14, fontFamily: FONTS.regular, opacity: 0.85, marginBottom: 0, lineHeight: 20 },
-  windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 14, padding: 10 },
-  windowIcon:   { width: 36, height: 36, borderRadius: 12, backgroundColor: 'rgba(14,23,38,0.85)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  windowLabel:  { fontSize: 11, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
-  windowTime:   { fontSize: 16, fontFamily: FONTS.semiBold },
+  verdictCard:  { borderRadius: 28, paddingTop: 28, paddingHorizontal: 24, paddingBottom: 24, marginBottom: 14 },
+  verdictTime:  { fontSize: 12, fontFamily: FONTS.bold, letterSpacing: 0.14, textTransform: 'uppercase', opacity: 0.7, marginBottom: 10, textAlign: 'center' },
+  verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, textAlign: 'center' },
+  coefLine:     { fontSize: 11, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
+  windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 18, padding: 14 },
+  windowIcon:   { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  windowLabel:  { fontSize: 12, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
+  windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
+  windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
+
+  // Conditions vs seuils
+  threshCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: COLORS.hairline },
+  threshIcon:   { width: 42, height: 42, borderRadius: 13, backgroundColor: COLORS.paperSoft, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  threshLabel:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3, marginBottom: 6 },
+  threshValues: { flexDirection: 'row', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' },
+  threshItem:   { fontSize: 13 },
+  threshVal:    { fontSize: 15, fontFamily: FONTS.display, fontWeight: '600', color: COLORS.ink },
+  threshMax:    { fontSize: 11, color: COLORS.ink3 },
+  threshOver:   { color: COLORS.stopDeep },
+  threshDraft:  { fontSize: 12, color: COLORS.ink3 },
 
   // KPI row
   kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
@@ -317,10 +354,10 @@ const styles = StyleSheet.create({
   seaStatUnit: { fontSize: 11, opacity: 0.6 },
 
   // Action cards
-  planCard: { backgroundColor: COLORS.tideInk, borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
-  planIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: COLORS.brand, alignItems: 'center', justifyContent: 'center' },
+  planCard: { backgroundColor: '#f4c98d', borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
+  planIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#6c9ca0', alignItems: 'center', justifyContent: 'center' },
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
-  planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.6)' },
+  planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
   boatCard: { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: COLORS.hairline },
   boatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.paperSoft, alignItems: 'center', justifyContent: 'center' },

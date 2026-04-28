@@ -5,7 +5,7 @@ import { computeScore, levelFromScore } from '../utils/verdictCalculator';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
-import FabNav, { Screen } from '../components/FabNav';
+import NavFade, { Screen } from '../components/NavFade';
 
 interface DayData {
   date: Date;
@@ -23,7 +23,10 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date)
   for (let d = 0; d < 7; d++) {
     const date = new Date(today);
     date.setDate(today.getDate() + d);
-    const prefix = date.toISOString().slice(0, 10);
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, '0');
+    const dy = String(date.getDate()).padStart(2, '0');
+    const prefix = `${y}-${mo}-${dy}`;
 
     const hourly = weather.hourly.filter(h => h.time.startsWith(prefix));
     if (hourly.length === 0) continue;
@@ -87,7 +90,7 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
     return (
       <View style={[styles.screen, { alignItems: 'center', justifyContent: 'center' }]}>
         <Text style={{ fontFamily: FONTS.regular, color: COLORS.ink3 }}>Chargement météo 7 jours…</Text>
-        <FabNav active="week" onChange={onNav} />
+        <NavFade active="week" onChange={onNav} />
       </View>
     );
   }
@@ -205,7 +208,7 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
         })}
       </ScrollView>
 
-      <FabNav active="week" onChange={onNav} />
+      <NavFade active="week" onChange={onNav} />
     </View>
   );
 }

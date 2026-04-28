@@ -7,7 +7,7 @@ import { TideData, TidePoint } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
-import FabNav, { Screen } from '../components/FabNav';
+import NavFade, { Screen } from '../components/NavFade';
 
 interface Props {
   tideData: TideData | null;
@@ -218,7 +218,7 @@ export default function TideScreen({ tideData, selectedDate, onNav }: Props) {
         )}
       </ScrollView>
 
-      <FabNav active="tide" onChange={onNav} />
+      <NavFade active="tide" onChange={onNav} />
     </View>
   );
 }
