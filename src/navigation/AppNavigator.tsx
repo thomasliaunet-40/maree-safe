@@ -6,7 +6,7 @@ import { ALL_PORTS } from '../constants/ports';
 import { fetchTideData } from '../services/tideService';
 import { fetchWeatherData } from '../services/weatherService';
 import { saveApiKey, loadApiKey, saveSelectedPortId, loadSelectedPortId } from '../services/storageService';
-import { saveBoatSettings, loadBoatSettings } from '../services/boatService';
+import { saveBoatProfiles, loadBoatProfiles, saveActiveBoatIndex, loadActiveBoatIndex } from '../services/boatService';
 import { calculateVerdict } from '../utils/verdictCalculator';
 import { Screen } from '../components/FabNav';
 
@@ -28,7 +28,8 @@ function isSameDay(a: Date, b: Date) {
 export default function AppNavigator() {
   const [screen, setScreen] = useState<Screen>('home');
   const [port, setPort] = useState<Port>(DEFAULT_PORT);
-  const [boat, setBoat] = useState<BoatSettings>(BOAT_DEFAULT);
+  const [boats, setBoats] = useState<(BoatSettings | null)[]>([null, null, null]);
+  const [activeBoatIndex, setActiveBoatIndex] = useState(0);
   const [apiKey, setApiKey] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; });
   const [tideData, setTideData] = useState<TideData | null>(null);
@@ -40,19 +41,22 @@ export default function AppNavigator() {
   const [showApiKey, setShowApiKey] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
+  const activeBoat = boats[activeBoatIndex] ?? BOAT_DEFAULT;
+
   useEffect(() => {
     (async () => {
-      const [key, portId, savedBoat] = await Promise.all([
-        loadApiKey(), loadSelectedPortId(), loadBoatSettings(),
+      const [key, portId, profiles, idx] = await Promise.all([
+        loadApiKey(), loadSelectedPortId(), loadBoatProfiles(), loadActiveBoatIndex(),
       ]);
       if (key) setApiKey(key);
       if (portId) { const p = ALL_PORTS.find(x => x.id === portId); if (p) setPort(p); }
-      setBoat(savedBoat);
+      setBoats(profiles);
+      setActiveBoatIndex(idx);
       setInitialized(true);
     })();
   }, []);
 
-  const loadData = useCallback(async (p: Port, key: string, date: Date, b: BoatSettings) => {
+  const loadData = useCallback(async (p: Port, key: string, date: Date, boat: BoatSettings) => {
     setLoading(true);
     setTideError(null);
     setWeatherError(null);
@@ -79,22 +83,27 @@ export default function AppNavigator() {
       setWeatherError((weatherRes.reason as Error).message);
     }
 
-    if (newWeather) setVerdict(calculateVerdict(newWeather, b, date));
+    if (newWeather) setVerdict(calculateVerdict(newWeather, boat, date));
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    if (initialized) loadData(port, apiKey, selectedDate, boat);
+    if (initialized) loadData(port, apiKey, selectedDate, activeBoat);
   }, [initialized, port, selectedDate]);
 
-  // Recalcule le verdict si le bateau change (sans refetch)
+  // Recalcule verdict quand le bateau actif change
   useEffect(() => {
-    if (weatherData) setVerdict(calculateVerdict(weatherData, boat, selectedDate));
-  }, [boat]);
+    if (weatherData) setVerdict(calculateVerdict(weatherData, activeBoat, selectedDate));
+  }, [boats, activeBoatIndex]);
 
-  const handleBoatChange = async (b: BoatSettings) => {
-    setBoat(b);
-    await saveBoatSettings(b);
+  const handleBoatsChange = async (next: (BoatSettings | null)[]) => {
+    setBoats(next);
+    await saveBoatProfiles(next);
+  };
+
+  const handleActiveIndexChange = async (index: number) => {
+    setActiveBoatIndex(index);
+    await saveActiveBoatIndex(index);
   };
 
   const handlePortSelect = async (p: Port) => {
@@ -107,7 +116,7 @@ export default function AppNavigator() {
   const handleApiKeySave = async (key: string) => {
     setApiKey(key);
     await saveApiKey(key);
-    loadData(port, key, selectedDate, boat);
+    loadData(port, key, selectedDate, activeBoat);
   };
 
   const handleSelectDate = (d: Date) => {
@@ -117,7 +126,6 @@ export default function AppNavigator() {
   };
 
   const isToday = isSameDay(selectedDate, new Date());
-
   const commonProps = { onNav: setScreen };
 
   return (
@@ -131,7 +139,7 @@ export default function AppNavigator() {
           loading={loading}
           tideError={tideError}
           weatherError={weatherError}
-          boat={boat}
+          boat={activeBoat}
           selectedDate={selectedDate}
           isToday={isToday}
           {...commonProps}
@@ -147,7 +155,7 @@ export default function AppNavigator() {
       {screen === 'week' && (
         <WeekScreen
           weatherData={weatherData}
-          boat={boat}
+          boat={activeBoat}
           today={new Date()}
           onSelectDate={handleSelectDate}
           {...commonProps}
@@ -162,8 +170,10 @@ export default function AppNavigator() {
       )}
       {screen === 'boat' && (
         <BoatScreen
-          boat={boat}
-          onChange={handleBoatChange}
+          boats={boats}
+          activeIndex={activeBoatIndex}
+          onBoatsChange={handleBoatsChange}
+          onActiveIndexChange={handleActiveIndexChange}
           {...commonProps}
         />
       )}

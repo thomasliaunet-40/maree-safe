@@ -1,21 +1,62 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useCallback } from 'react';
+import {
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  useWindowDimensions, NativeScrollEvent, NativeSyntheticEvent, Alert,
+} from 'react-native';
 import Slider from '@react-native-community/slider';
 import Svg, { Path, Line } from 'react-native-svg';
-import { BoatSettings } from '../types';
+import { BoatSettings, BOAT_DEFAULT } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
 import NavFade, { Screen } from '../components/NavFade';
 
+const SLOT_COUNT = 3;
+
 interface Props {
-  boat: BoatSettings;
-  onChange: (b: BoatSettings) => void;
+  boats: (BoatSettings | null)[];
+  activeIndex: number;
+  onBoatsChange: (boats: (BoatSettings | null)[]) => void;
+  onActiveIndexChange: (index: number) => void;
   onNav: (s: Screen) => void;
 }
 
-export default function BoatScreen({ boat, onChange, onNav }: Props) {
-  const update = (k: keyof BoatSettings, v: any) => onChange({ ...boat, [k]: v });
+export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActiveIndexChange, onNav }: Props) {
+  const { width: screenWidth } = useWindowDimensions();
+  const carouselRef = useRef<ScrollView>(null);
+
+  const addBoat = (index: number) => {
+    const next = [...boats] as (BoatSettings | null)[];
+    next[index] = { ...BOAT_DEFAULT };
+    onBoatsChange(next);
+  };
+
+  const removeBoat = (index: number) => {
+    Alert.alert('Supprimer ce bateau ?', 'Les réglages seront perdus.', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer', style: 'destructive', onPress: () => {
+          const next = [...boats] as (BoatSettings | null)[];
+          next[index] = null;
+          onBoatsChange(next);
+        },
+      },
+    ]);
+  };
+
+  const updateBoat = (index: number, key: keyof BoatSettings, value: any) => {
+    const next = [...boats] as (BoatSettings | null)[];
+    next[index] = { ...(next[index] as BoatSettings), [key]: value };
+    onBoatsChange(next);
+  };
+
+  const handleScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+    const clamped = Math.max(0, Math.min(SLOT_COUNT - 1, index));
+    if (clamped !== activeIndex) onActiveIndexChange(clamped);
+  }, [screenWidth, activeIndex, onActiveIndexChange]);
+
+  const activeBoat = boats[activeIndex];
 
   return (
     <View style={styles.screen}>
@@ -27,64 +68,124 @@ export default function BoatScreen({ boat, onChange, onNav }: Props) {
         <View style={{ width: 32 }} />
       </View>
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.heading}>Réglages</Text>
 
-        {/* Hero card */}
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTag}>Mon bateau</Text>
-          <Text style={styles.heroName}>Voilier</Text>
-          <Text style={styles.heroSub}>Voilier · {boat.draft}m TE</Text>
-          {/* Silhouette SVG */}
-          <View style={{ marginTop: 18, alignItems: 'center' }}>
-            <Svg width={200} height={80} viewBox="0 0 200 80">
-              <Path d="M30 60 Q 100 80 170 60 L 160 50 L 40 50 Z" fill="rgba(255,255,255,0.15)" />
-              <Path d="M40 50 L 100 8 L 100 50 Z" fill="rgba(255,255,255,0.85)" />
-              <Line x1={100} y1={8} x2={100} y2={60} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} />
-              <Path d="M0 70 Q 50 65 100 70 T 200 70" stroke="rgba(255,255,255,0.3)" strokeWidth={1} fill="none" />
-              <Path d="M0 76 Q 50 71 100 76 T 200 76" stroke="rgba(255,255,255,0.2)" strokeWidth={1} fill="none" />
-            </Svg>
-          </View>
+        {/* Carousel — échappe le padding parent */}
+        <View style={{ marginHorizontal: -18 }}>
+          <ScrollView
+            ref={carouselRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleScroll}
+            contentOffset={{ x: activeIndex * screenWidth, y: 0 }}
+            scrollEventThrottle={16}
+          >
+            {Array.from({ length: SLOT_COUNT }).map((_, i) => {
+              const boat = boats[i];
+              return (
+                <View key={i} style={{ width: screenWidth, paddingHorizontal: 18 }}>
+                  {boat ? (
+                    <View style={styles.heroCard}>
+                      <View style={styles.heroHeader}>
+                        <Text style={styles.heroTag}>Bateau {i + 1}</Text>
+                        <TouchableOpacity
+                          onPress={() => removeBoat(i)}
+                          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                        >
+                          <Icon name="trash" size={16} stroke="rgba(255,255,255,0.45)" />
+                        </TouchableOpacity>
+                      </View>
+                      <Text style={styles.heroName}>Voilier</Text>
+                      <Text style={styles.heroSub}>Voilier · {boat.draft}m TE</Text>
+                      <View style={{ marginTop: 18, alignItems: 'center' }}>
+                        <Svg width={200} height={80} viewBox="0 0 200 80">
+                          <Path d="M30 60 Q 100 80 170 60 L 160 50 L 40 50 Z" fill="rgba(255,255,255,0.15)" />
+                          <Path d="M40 50 L 100 8 L 100 50 Z" fill="rgba(255,255,255,0.85)" />
+                          <Line x1={100} y1={8} x2={100} y2={60} stroke="rgba(255,255,255,0.5)" strokeWidth={1.5} />
+                          <Path d="M0 70 Q 50 65 100 70 T 200 70" stroke="rgba(255,255,255,0.3)" strokeWidth={1} fill="none" />
+                          <Path d="M0 76 Q 50 71 100 76 T 200 76" stroke="rgba(255,255,255,0.2)" strokeWidth={1} fill="none" />
+                        </Svg>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.heroCardEmpty}
+                      onPress={() => addBoat(i)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={styles.addBtn}>
+                        <Icon name="plus" size={30} stroke="rgba(255,255,255,0.65)" strokeWidth={1.5} />
+                      </View>
+                      <Text style={styles.addTxt}>Ajouter mon bateau</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
 
-        {/* Caractéristiques */}
-        <Text style={styles.sectionLabel}>Caractéristiques</Text>
-        <SliderCard
-          label="Tirant d'eau"
-          value={boat.draft}
-          min={0.4} max={3.5} step={0.1}
-          unit="m"
-          onChange={v => update('draft', v)}
-          rangeMin="0.4 m" rangeMax="3.5 m"
-          accentColor={COLORS.brand}
-        />
+        {/* Indicateur dots */}
+        <View style={styles.dots}>
+          {Array.from({ length: SLOT_COUNT }).map((_, i) => (
+            <View
+              key={i}
+              style={[
+                styles.dot,
+                i === activeIndex && styles.dotActive,
+                boats[i] && i !== activeIndex && styles.dotFilled,
+              ]}
+            />
+          ))}
+        </View>
 
-        {/* Seuils de sécurité */}
-        <Text style={styles.sectionLabel}>Seuils de sécurité</Text>
-        <SliderCard
-          label="Vent maximum"
-          sublabel="Au-delà, sortie déconseillée"
-          value={boat.maxWind}
-          min={10} max={45} step={1}
-          unit="kn"
-          onChange={v => update('maxWind', v)}
-          rangeMin="10 kn" rangeMax="45 kn"
-          accentColor={COLORS.sandInk}
-          cardStyle={{ backgroundColor: COLORS.sand }}
-          valueStyle={{ color: COLORS.sandInk }}
-        />
-        <SliderCard
-          label="Vagues maximum"
-          sublabel="Hauteur significative"
-          value={boat.maxWaves}
-          min={0.5} max={4} step={0.1}
-          unit="m"
-          onChange={v => update('maxWaves', v)}
-          rangeMin="0.5 m" rangeMax="4 m"
-          accentColor={COLORS.tideInk}
-          cardStyle={{ backgroundColor: COLORS.tide }}
-          valueStyle={{ color: COLORS.tideInk }}
-        />
+        {/* Sliders — uniquement pour le slot actif rempli */}
+        {activeBoat && (
+          <>
+            <Text style={styles.sectionLabel}>Caractéristiques</Text>
+            <SliderCard
+              label="Tirant d'eau"
+              value={activeBoat.draft}
+              min={0.4} max={3.5} step={0.1}
+              unit="m"
+              onChange={v => updateBoat(activeIndex, 'draft', v)}
+              rangeMin="0.4 m" rangeMax="3.5 m"
+              accentColor={COLORS.brand}
+            />
+
+            <Text style={styles.sectionLabel}>Seuils de sécurité</Text>
+            <SliderCard
+              label="Vent maximum"
+              sublabel="Au-delà, sortie déconseillée"
+              value={activeBoat.maxWind}
+              min={10} max={45} step={1}
+              unit="kn"
+              onChange={v => updateBoat(activeIndex, 'maxWind', v)}
+              rangeMin="10 kn" rangeMax="45 kn"
+              accentColor={COLORS.sandInk}
+              cardStyle={{ backgroundColor: COLORS.sand }}
+              valueStyle={{ color: COLORS.sandInk }}
+            />
+            <SliderCard
+              label="Vagues maximum"
+              sublabel="Hauteur significative"
+              value={activeBoat.maxWaves}
+              min={0.5} max={4} step={0.1}
+              unit="m"
+              onChange={v => updateBoat(activeIndex, 'maxWaves', v)}
+              rangeMin="0.5 m" rangeMax="4 m"
+              accentColor={COLORS.tideInk}
+              cardStyle={{ backgroundColor: COLORS.tide }}
+              valueStyle={{ color: COLORS.tideInk }}
+            />
+          </>
+        )}
       </ScrollView>
 
       <NavFade active="boat" onChange={onNav} />
@@ -114,7 +215,7 @@ function SliderCard({ label, sublabel, value, min, max, step, unit, onChange, ra
           {sublabel && <Text style={styles.sliderSub}>{sublabel}</Text>}
         </View>
         <Text style={[styles.sliderValue, valueStyle]}>
-          {typeof value === 'number' && step < 1 ? value.toFixed(1) : value}
+          {step < 1 ? value.toFixed(1) : value}
           <Text style={styles.sliderUnit}> {unit}</Text>
         </Text>
       </View>
@@ -145,10 +246,31 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 18, paddingBottom: 120 },
   heading:   { fontSize: 32, fontFamily: FONTS.display, color: COLORS.ink, marginTop: 8, marginHorizontal: 4, marginBottom: 18 },
 
-  heroCard: { backgroundColor: COLORS.ink, borderRadius: 28, padding: 20, marginBottom: 22 },
-  heroTag:  { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONTS.semiBold, letterSpacing: 0.12, textTransform: 'uppercase' },
-  heroName: { fontSize: 32, fontFamily: FONTS.display, color: '#fff', marginTop: 8, lineHeight: 36 },
-  heroSub:  { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontFamily: FONTS.regular, marginTop: 4 },
+  // Hero card — remplie
+  heroCard:   { backgroundColor: COLORS.ink, borderRadius: 28, padding: 20 },
+  heroHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
+  heroTag:    { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONTS.semiBold, letterSpacing: 0.12, textTransform: 'uppercase' },
+  heroName:   { fontSize: 32, fontFamily: FONTS.display, color: '#fff', marginTop: 8, lineHeight: 36 },
+  heroSub:    { fontSize: 14, color: 'rgba(255,255,255,0.7)', fontFamily: FONTS.regular, marginTop: 4 },
+
+  // Hero card — vide
+  heroCardEmpty: {
+    height: 180, backgroundColor: COLORS.ink, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center', gap: 12,
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.08)', borderStyle: 'dashed',
+  },
+  addBtn: {
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  addTxt: { fontSize: 14, fontFamily: FONTS.semiBold, color: 'rgba(255,255,255,0.55)' },
+
+  // Dots
+  dots:     { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 14, marginBottom: 24 },
+  dot:      { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.hairline },
+  dotActive:{ width: 20, borderRadius: 3, backgroundColor: COLORS.ink },
+  dotFilled:{ backgroundColor: COLORS.ink3 },
 
   sectionLabel: { fontSize: 11, fontFamily: FONTS.semiBold, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 0.12, marginBottom: 12 },
 
@@ -159,5 +281,5 @@ const styles = StyleSheet.create({
   sliderValue: { fontSize: 22, fontFamily: FONTS.display, color: COLORS.ink },
   sliderUnit:  { fontSize: 12, opacity: 0.6 },
   sliderRange: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  sliderRangeTxt:{ fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
+  sliderRangeTxt: { fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
 });

@@ -132,8 +132,8 @@ export default function HomeScreen({
               )}
             </View>
 
-            {/* Conditions vs mes seuils */}
-            {weatherData && (
+            {/* Conditions vs mes seuils — masqué si aucun bateau configuré */}
+            {weatherData && boat !== null && (
               <TouchableOpacity
                 style={styles.threshCard}
                 onPress={() => onNav('boat')}
