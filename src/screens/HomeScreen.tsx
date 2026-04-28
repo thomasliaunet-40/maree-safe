@@ -189,7 +189,6 @@ export default function HomeScreen({
               <View style={{ marginTop: 20 }}>
                 <VerdictTimeline
                   hourlyScores={verdict.hourlyScores}
-                  recommendedWindow={verdict.recommendedWindow}
                   currentHour={displayHour}
                   onHourChange={setScrubHour}
                 />
@@ -211,20 +210,26 @@ export default function HomeScreen({
                 </Text>
               )}
 
-              {/* Fenêtre recommandée */}
-              {verdict.recommendedWindow && (
+              {/* Fenêtres optimales */}
+              {verdict.recommendedWindows.length > 0 && (
                 <View style={styles.windowRow}>
                   <View style={[styles.windowIcon, { backgroundColor: `${ink}CC` }]}>
                     <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.windowLabel, { color: ink }]}>FENÊTRE OPTIMALE</Text>
-                    <Text style={[styles.windowTime, { color: ink }]}>
-                      {verdict.recommendedWindow.start}h00 — {verdict.recommendedWindow.end}h00
-                      <Text style={[styles.windowDur, { color: ink }]}>
-                        {' '}· {verdict.recommendedWindow.end - verdict.recommendedWindow.start}h
-                      </Text>
+                    <Text style={[styles.windowLabel, { color: ink }]}>
+                      {verdict.recommendedWindows.length > 1 ? 'FENÊTRES OPTIMALES' : 'FENÊTRE OPTIMALE'}
                     </Text>
+                    {verdict.recommendedWindows.map((w, i) => (
+                      <View key={i} style={i > 0 ? styles.windowSep : undefined}>
+                        <Text style={[styles.windowTime, { color: ink }]}>
+                          {w.start}h00 — {w.end + 1}h00
+                          <Text style={[styles.windowDur, { color: ink }]}>
+                            {' '}· {w.end - w.start + 1}h
+                          </Text>
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               )}
@@ -426,6 +431,7 @@ const styles = StyleSheet.create({
   windowLabel:  { fontSize: 12, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
   windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
+  windowSep:    { marginTop: 4 },
 
   // Chip retour à maintenant
   nowChip:     { alignSelf: 'center', marginTop: 10, paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },

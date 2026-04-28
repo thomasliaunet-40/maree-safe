@@ -77,37 +77,22 @@ function buildHourlyScores(
   return Array.from({ length: 24 }, (_, i) => byHour[i] ?? 50);
 }
 
-function findBestWindow(scores: number[]): { start: number; end: number } | null {
-  let best: { start: number; end: number; len: number } | null = null;
+function findAllWindows(scores: number[]): { start: number; end: number }[] {
+  // Cherche d'abord les fenêtres vertes (score ≥ 65), sinon orange (≥ 35)
+  const threshold = scores.some(s => s >= 65) ? 65 : 35;
+  const windows: { start: number; end: number }[] = [];
   let i = 0;
   while (i < 24) {
-    if (scores[i] >= 65) {
+    if (scores[i] >= threshold) {
       let j = i;
-      while (j < 24 && scores[j] >= 65) j++;
-      const len = j - i;
-      if (!best || len > best.len) best = { start: i, end: j - 1, len };
+      while (j < 24 && scores[j] >= threshold) j++;
+      windows.push({ start: i, end: j - 1 });
       i = j;
     } else {
       i++;
     }
   }
-  // Fallback: meilleure plage orange
-  if (!best) {
-    let i2 = 0;
-    while (i2 < 24) {
-      if (scores[i2] >= 35) {
-        let j = i2;
-        while (j < 24 && scores[j] >= 35) j++;
-        const len = j - i2;
-        if (!best || len > (best as any).len) best = { start: i2, end: j - 1, len };
-        i2 = j;
-      } else {
-        i2++;
-      }
-    }
-  }
-  if (!best || best.len < 1) return null;
-  return { start: best.start, end: best.end };
+  return windows;
 }
 
 export function calculateVerdict(
@@ -145,7 +130,7 @@ export function calculateVerdict(
   if (level === 'green' && reasons.length === 0)
     reasons.push(`Vent ${Math.round(weather.windSpeed)} kn · Vagues ${weather.waveHeight.toFixed(1)} m`);
 
-  const recommendedWindow = findBestWindow(hourlyScores);
+  const recommendedWindows = findAllWindows(hourlyScores);
 
   const titles: Record<VerdictLevel, string> = {
     green:  'Conditions favorables',
@@ -158,5 +143,5 @@ export function calculateVerdict(
     red:    'Attendez une meilleure fenêtre.',
   };
 
-  return { level, score, hourlyScores, title: titles[level], subtitle: subtitles[level], reasons, recommendedWindow };
+  return { level, score, hourlyScores, title: titles[level], subtitle: subtitles[level], reasons, recommendedWindows };
 }

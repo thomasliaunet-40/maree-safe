@@ -55,7 +55,7 @@ export interface VerdictResult {
   title: string;
   subtitle: string;
   reasons: string[];
-  recommendedWindow: { start: number; end: number } | null; // heures entières
+  recommendedWindows: { start: number; end: number }[]; // heures entières, toutes les fenêtres du jour
 }
 
 export interface BoatSettings {

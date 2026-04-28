@@ -13,7 +13,6 @@ function scoreToColor(s: number): string {
 
 interface Props {
   hourlyScores: number[];
-  recommendedWindow: { start: number; end: number } | null;
   currentHour: number;
   onHourChange?: (hour: number) => void;
 }

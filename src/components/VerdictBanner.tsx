@@ -55,10 +55,10 @@ export default function VerdictBanner({ verdict, tidePoints, hourlyWeather, isTo
             value={`${currentHour.waveHeight.toFixed(1)} m`}
             label="Vagues"
           />
-          {verdict.recommendedWindow ? (
+          {verdict.recommendedWindows.length > 0 ? (
             <MetricBadge
               icon="time-outline"
-              value={`${verdict.recommendedWindow.start}`}
+              value={`${verdict.recommendedWindows[0].start}h`}
               label="Meilleure heure"
             />
           ) : (
@@ -93,17 +93,17 @@ export default function VerdictBanner({ verdict, tidePoints, hourlyWeather, isTo
       )}
 
       {/* Plage recommandée */}
-      {verdict.recommendedWindow && (
+      {verdict.recommendedWindows.length > 0 && (
         <View style={[styles.window, { borderTopColor: border }]}>
           <Ionicons name="time-outline" size={14} color={COLORS.textSecondary} />
-          <Text style={styles.windowLabel}> Plage recommandée : </Text>
+          <Text style={styles.windowLabel}> Plages recommandées : </Text>
           <Text style={[styles.windowTime, { color }]}>
-            {verdict.recommendedWindow.start} – {verdict.recommendedWindow.end}
+            {verdict.recommendedWindows.map(w => `${w.start}h–${w.end + 1}h`).join(' · ')}
           </Text>
         </View>
       )}
 
-      {!verdict.recommendedWindow && verdict.level === 'red' && (
+      {verdict.recommendedWindows.length === 0 && verdict.level === 'red' && (
         <View style={[styles.window, { borderTopColor: border }]}>
           <Ionicons name="time-outline" size={14} color={COLORS.textMuted} />
           <Text style={[styles.windowLabel, { color: COLORS.textMuted }]}>
