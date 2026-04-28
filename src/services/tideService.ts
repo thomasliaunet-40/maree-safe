@@ -37,52 +37,62 @@ function buildTideData(port: Port, points: TidePoint[], isToday: boolean): TideD
 export async function fetchTideData(
   port: Port,
   apiKey: string,
-  selectedDate: Date = new Date()
+  selectedDate: Date = new Date(),
+  extraDays: number = 0
 ): Promise<TideData> {
   const today = new Date();
   const isToday = isSameDay(selectedDate, today);
 
-  // Essai depuis le cache local (généré par scripts/fetchTides.js)
-  const cached = await getPointsForDate(port.id, selectedDate);
-  if (cached) {
-    return buildTideData(port, cached, isToday);
+  // Points du jour principal (pour peaks / coefficient / currentHeight)
+  let basePoints = await getPointsForDate(port.id, selectedDate);
+
+  if (!basePoints) {
+    // Fallback API uniquement pour aujourd'hui
+    if (!isToday) throw new Error('Données non disponibles pour cette date');
+
+    const key = apiKey || API_KEY;
+    const { from, to } = buildDateRange(today);
+
+    const url =
+      `${BASE_URL}/water-levels` +
+      `?site=${port.id}` +
+      `&from=${encodeURIComponent(from)}` +
+      `&to=${encodeURIComponent(to)}` +
+      `&step=10` +
+      `&tz=Europe%2FParis` +
+      `&key=${key}`;
+
+    const response = await fetch(url);
+
+    if (response.status === 401 || response.status === 403) throw new Error('CLÉ_API_INVALIDE');
+    if (!response.ok) throw new Error(`Erreur API marée : ${response.status}`);
+
+    const json = await response.json();
+    if (!json.data || !Array.isArray(json.data)) throw new Error('Format de réponse invalide');
+
+    basePoints = json.data.map((item: { time: string; height: number }) => ({
+      time: item.time,
+      height: Number(item.height),
+    }));
   }
 
-  // Fallback API uniquement pour aujourd'hui
-  if (!isToday) {
-    throw new Error('Données non disponibles pour cette date');
+  const safeBase = basePoints ?? [];
+
+  // Calcul des métadonnées sur le jour principal uniquement
+  const peaks = findTidePeaks(safeBase);
+  const coefficient = calculateCoefficient(peaks, port.refMarnage);
+  const { height: currentHeight, isRising } = isToday
+    ? getCurrentHeight(safeBase)
+    : { height: 0, isRising: true };
+
+  // Merge des jours supplémentaires pour la timeline étendue
+  const allPoints: TidePoint[] = [...safeBase];
+  for (let i = 1; i <= extraDays; i++) {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + i);
+    const extra = await getPointsForDate(port.id, d);
+    if (extra) allPoints.push(...extra);
   }
 
-  const key = apiKey || API_KEY;
-  const { from, to } = buildDateRange(today);
-
-  const url =
-    `${BASE_URL}/water-levels` +
-    `?site=${port.id}` +
-    `&from=${encodeURIComponent(from)}` +
-    `&to=${encodeURIComponent(to)}` +
-    `&step=10` +
-    `&tz=Europe%2FParis` +
-    `&key=${key}`;
-
-  const response = await fetch(url);
-
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('CLÉ_API_INVALIDE');
-  }
-  if (!response.ok) {
-    throw new Error(`Erreur API marée : ${response.status}`);
-  }
-
-  const json = await response.json();
-  if (!json.data || !Array.isArray(json.data)) {
-    throw new Error('Format de réponse invalide');
-  }
-
-  const points: TidePoint[] = json.data.map((item: { time: string; height: number }) => ({
-    time: item.time,
-    height: Number(item.height),
-  }));
-
-  return buildTideData(port, points, true);
+  return { port: port.id, points: allPoints, peaks, coefficient, currentHeight, isRising };
 }

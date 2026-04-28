@@ -62,7 +62,7 @@ export default function AppNavigator() {
     setWeatherError(null);
 
     const [tideRes, weatherRes] = await Promise.allSettled([
-      fetchTideData(p, key, date),
+      fetchTideData(p, key, date, 2),
       fetchWeatherData(p),
     ]);
 
