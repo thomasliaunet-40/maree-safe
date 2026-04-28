@@ -241,9 +241,12 @@ export default function HomeScreen({
                 activeOpacity={isScrubbing ? 0.6 : 1}
               >
                 <Text style={[styles.verdictTime, { color: ink }]}>
-                  {isScrubbing
-                    ? `→ ${String(displayHourInt).padStart(2, '0')}h${displayDate.getMinutes() >= 30 ? '30' : '00'}`
-                    : isToday
+                  {isScrubbing ? (() => {
+                    const mins = displayDate.getMinutes() >= 30 ? '30' : '00';
+                    const timeStr = `${String(displayHourInt).padStart(2, '0')}h${mins}`;
+                    const isNextDay = displayDate.getDate() !== now.getDate();
+                    return isNextDay ? `demain ${timeStr}` : `→ ${timeStr}`;
+                  })() : isToday
                     ? `Maintenant · ${String(hour).padStart(2, '0')}h00`
                     : dateLabel}
                 </Text>
@@ -470,7 +473,7 @@ const styles = StyleSheet.create({
 
   // Verdict
   verdictCard:  { borderRadius: 28, paddingTop: 28, paddingHorizontal: 24, paddingBottom: 24, marginBottom: 14 },
-  verdictTime:  { fontSize: 12, fontFamily: FONTS.bold, letterSpacing: 0.14, textTransform: 'uppercase', opacity: 0.7, marginBottom: 10, textAlign: 'center' },
+  verdictTime:  { fontSize: 20, fontFamily: FONTS.display, letterSpacing: -0.3, opacity: 0.85, marginBottom: 10, textAlign: 'center' },
   verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, textAlign: 'center' },
   coefLine:     { fontSize: 11, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
   windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 18, padding: 14 },
