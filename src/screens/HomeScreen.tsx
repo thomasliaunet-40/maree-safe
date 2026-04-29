@@ -184,9 +184,9 @@ export default function HomeScreen({
 
   const displayScoreIdx = Math.max(0, Math.min(TOTAL_HOURS - 1, Math.round((scrubOffset ?? 0) + PAST_HOURS)));
   const displayScore = (() => {
-    if (!isScrubbing) return verdict?.hourlyScores[hour] ?? verdict?.score ?? 0;
+    if (scrubOffset === null) return verdict?.hourlyScores[hour] ?? verdict?.score ?? 0;
     if (isToday) return scores50h[displayScoreIdx] ?? 50;
-    const idx = Math.max(0, Math.min(23, Math.round(Math.min(hour, 22) + scrubOffset!)));
+    const idx = Math.max(0, Math.min(23, Math.round(Math.min(hour, 22) + scrubOffset)));
     return verdict?.hourlyScores[idx] ?? 50;
   })();
   const { bg, ink } = scoreColor(displayScore);
