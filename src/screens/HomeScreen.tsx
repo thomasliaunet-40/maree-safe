@@ -156,6 +156,21 @@ export default function HomeScreen({
     return buildTimelineData(startEpoch, TOTAL_HOURS, weatherData, tideData, boat);
   }, [weatherData, tideData, boat]);
 
+  // Hauteurs marée heure par heure pour les dates non-aujourd'hui
+  const tideH24ForDate = useMemo(() => {
+    if (isToday || !tideData) return undefined;
+    const base = new Date(selectedDate);
+    base.setHours(0, 0, 0, 0);
+    return Array.from({ length: 24 }, (_, i) => {
+      const d = new Date(base.getTime() + i * 3600000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const prefix = `${y}-${m}-${dd}T${String(i).padStart(2, '0')}`;
+      return tideData.points.find(p => p.time.startsWith(prefix))?.height ?? 0;
+    });
+  }, [isToday, tideData, selectedDate]);
+
   // Heure/date affichée selon le scrub
   const displayMs = scrubOffset !== null ? now.getTime() + scrubOffset * 3600000 : now.getTime();
   const displayDate = new Date(displayMs);
@@ -174,9 +189,11 @@ export default function HomeScreen({
   const displayWind  = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
   const displayGust  = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
   const displayWaveH = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
-  const displayTideH = scrubOffset !== null && tideData
-    ? (findTideHeight(tideData.points, displayHourInt, displayDate) ?? tideData.currentHeight)
-    : tideData?.currentHeight ?? 0;
+  const displayTideH = tideData ? (() => {
+    if (scrubOffset !== null) return findTideHeight(tideData.points, displayHourInt, displayDate) ?? tideData.currentHeight;
+    if (isToday) return tideData.currentHeight;
+    return findTideHeight(tideData.points, hour, selectedDate) ?? 0;
+  })() : 0;
 
   const isScrubbing = scrubOffset !== null;
 
@@ -258,7 +275,7 @@ export default function HomeScreen({
                 <VerdictTimeline
                   ref={timelineRef}
                   scores={isToday ? scores50h : verdict.hourlyScores}
-                  tideHeights={isToday ? tideH50 : undefined}
+                  tideHeights={isToday ? tideH50 : tideH24ForDate}
                   startEpoch={isToday ? startEpoch : new Date(selectedDate).setHours(0, 0, 0, 0)}
                   cursorHourOffset={isToday ? PAST_HOURS : Math.min(hour, 22)}
                   onOffsetChange={isToday ? setScrubOffset : undefined}
