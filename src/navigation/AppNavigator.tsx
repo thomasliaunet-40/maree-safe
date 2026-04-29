@@ -165,6 +165,7 @@ export default function AppNavigator() {
       {screen === 'week' && (
         <WeekScreen
           weatherData={weatherData}
+          tideData={tideData}
           boat={activeBoat}
           today={new Date()}
           onSelectDate={handleSelectDate}

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { WeatherData, BoatSettings } from '../types';
+import { WeatherData, TideData, BoatSettings } from '../types';
 import { computeScore, levelFromScore } from '../utils/verdictCalculator';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
@@ -11,14 +11,16 @@ interface DayData {
   date: Date;
   dayLabel: string;
   dateNum: number;
-  avgScore: number;
-  maxScore: number;
+  score: number;     // score minimum des heures de jour (pire moment)
+  maxScore: number;  // meilleur score de la journée
   avgWind: number;
   maxWave: number;
   bestWindow: { start: number; end: number } | null;
 }
 
-function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date): DayData[] {
+const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date, tideData: TideData | null): DayData[] {
   const days: DayData[] = [];
   for (let d = 0; d < 7; d++) {
     const date = new Date(today);
@@ -31,33 +33,52 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date)
     const hourly = weather.hourly.filter(h => h.time.startsWith(prefix));
     if (hourly.length === 0) continue;
 
-    const scores = hourly.map(h => computeScore(h.windSpeed, h.windGust, h.waveHeight, boat));
-    const byHour: Record<number, number> = {};
-    hourly.forEach((h, i) => { byHour[new Date(h.time).getHours()] = scores[i]; });
-    const all24 = Array.from({ length: 24 }, (_, i) => byHour[i] ?? 50);
+    // Heures de jour uniquement (7h-21h)
+    const daytime = hourly.filter(h => {
+      const hr = new Date(h.time).getHours();
+      return hr >= 7 && hr <= 21;
+    });
+    const sample = daytime.length > 0 ? daytime : hourly;
 
-    // Fenêtre verte
+    // Hauteurs de marée par heure pour ce jour
+    const tideByHour: Record<number, number> = {};
+    if (tideData) {
+      for (const p of tideData.points) {
+        if (!p.time.startsWith(prefix)) continue;
+        const hr = parseInt(p.time.split('T')[1]?.slice(0, 2) ?? '0', 10);
+        tideByHour[hr] = p.height;
+      }
+    }
+
+    const scoreByHour: Record<number, number> = {};
+    for (const h of sample) {
+      const hr = new Date(h.time).getHours();
+      scoreByHour[hr] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
+    }
+    const scores = Object.values(scoreByHour);
+
+    // Fenêtre optimale consécutive >= 65
     let best: { start: number; end: number; len: number } | null = null;
     let i = 0;
     while (i < 24) {
-      if (all24[i] >= 65) {
+      const s = scoreByHour[i];
+      if (s !== undefined && s >= 65) {
         let j = i;
-        while (j < 24 && all24[j] >= 65) j++;
+        while (j < 24 && (scoreByHour[j] ?? -1) >= 65) j++;
         const len = j - i;
         if (!best || len > best.len) best = { start: i, end: j - 1, len };
         i = j;
       } else i++;
     }
 
-    const avgScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
-    const avgWind = Math.round(hourly.reduce((a, h) => a + h.windSpeed, 0) / hourly.length);
-    const maxWave = Math.max(...hourly.map(h => h.waveHeight));
+    const avgWind = Math.round(sample.reduce((a, h) => a + h.windSpeed, 0) / sample.length);
+    const maxWave = Math.max(...sample.map(h => h.waveHeight));
 
-    const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
     days.push({
       date, dayLabel: DAYS_FR[date.getDay()], dateNum: date.getDate(),
-      avgScore, maxScore, avgWind, maxWave,
+      score: minScore, maxScore, avgWind, maxWave,
       bestWindow: best ? { start: best.start, end: best.end } : null,
     });
   }
@@ -73,17 +94,18 @@ function scoreColors(s: number) {
 
 interface Props {
   weatherData: WeatherData | null;
+  tideData: TideData | null;
   boat: BoatSettings;
   today: Date;
   onNav: (s: Screen) => void;
   onSelectDate: (d: Date) => void;
 }
 
-export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDate }: Props) {
+export default function WeekScreen({ weatherData, tideData, boat, today, onNav, onSelectDate }: Props) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const days = useMemo(
-    () => weatherData ? computeDailyData(weatherData, boat, today) : [],
-    [weatherData, boat, today]
+    () => weatherData ? computeDailyData(weatherData, boat, today, tideData) : [],
+    [weatherData, tideData, boat, today]
   );
 
   if (!weatherData || days.length === 0) {
@@ -96,11 +118,11 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
   }
 
   const day = days[selectedIdx];
-  const { bg, ink, label } = scoreColors(day.avgScore);
+  const { bg, ink, label } = scoreColors(day.score);
 
-  // Meilleures fenêtres globales
+  // Meilleures fenêtres globales (filtre sur maxScore pour ne pas exclure les bons jours à marée basse)
   const windows = days
-    .filter(d => d.bestWindow && d.avgScore >= 55)
+    .filter(d => d.bestWindow && d.maxScore >= 55)
     .sort((a, b) => b.maxScore - a.maxScore)
     .slice(0, 3);
 
@@ -125,7 +147,7 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
         {/* Chips 7 jours */}
         <View style={styles.chips}>
           {days.map((d, i) => {
-            const c = scoreColors(d.avgScore);
+            const c = scoreColors(d.score);
             const sel = i === selectedIdx;
             return (
               <TouchableOpacity
@@ -136,7 +158,7 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
               >
                 <Text style={[styles.chipDay, { color: sel ? '#fff' : c.ink }]}>{d.dayLabel}</Text>
                 <Text style={[styles.chipDate, { color: sel ? '#fff' : c.ink }]}>{d.dateNum}</Text>
-                <View style={[styles.chipBar, { backgroundColor: sel ? c.bg : 'rgba(0,0,0,0.15)', width: `${Math.max(20, d.avgScore)}%` as any }]} />
+                <View style={[styles.chipBar, { backgroundColor: sel ? c.bg : 'rgba(0,0,0,0.15)', width: `${Math.max(20, d.score)}%` as any }]} />
               </TouchableOpacity>
             );
           })}
@@ -151,7 +173,7 @@ export default function WeekScreen({ weatherData, boat, today, onNav, onSelectDa
               </Text>
               <Text style={[styles.detailLabel, { color: ink }]}>{label}</Text>
             </View>
-            <Text style={[styles.detailScore, { color: ink }]}>{day.avgScore}</Text>
+            <Text style={[styles.detailScore, { color: ink }]}>{day.score}</Text>
           </View>
           <View style={[styles.detailGrid, { borderTopColor: `rgba(0,0,0,0.1)` }]}>
             {[
