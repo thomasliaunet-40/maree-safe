@@ -1,24 +1,50 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { WeatherData, TideData, BoatSettings } from '../types';
-import { computeScore, levelFromScore } from '../utils/verdictCalculator';
+import { computeScore } from '../utils/verdictCalculator';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
 import NavFade, { Screen } from '../components/NavFade';
 
+interface Window {
+  start: number;
+  end: number;
+  duration: number;  // heures
+  ideal: boolean;    // score >= 65 (vs >= 35 pour "possible")
+}
+
 interface DayData {
   date: Date;
   dayLabel: string;
   dateNum: number;
-  score: number;     // score minimum des heures de jour (pire moment)
-  maxScore: number;  // meilleur score de la journée
+  window: Window | null;
   avgWind: number;
   maxWave: number;
-  bestWindow: { start: number; end: number } | null;
 }
 
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+function findBestWindow(scoreByHour: Record<number, number>): Window | null {
+  // Cherche d'abord une fenêtre idéale (>= 65), sinon possible (>= 35)
+  for (const threshold of [65, 35] as const) {
+    let best: { start: number; end: number; len: number } | null = null;
+    let i = 7;
+    while (i <= 21) {
+      if ((scoreByHour[i] ?? -1) >= threshold) {
+        let j = i;
+        while (j <= 21 && (scoreByHour[j] ?? -1) >= threshold) j++;
+        const len = j - i;
+        if (!best || len > best.len) best = { start: i, end: j - 1, len };
+        i = j;
+      } else i++;
+    }
+    if (best && best.len >= 1) {
+      return { start: best.start, end: best.end, duration: best.len, ideal: threshold === 65 };
+    }
+  }
+  return null;
+}
 
 function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date, tideData: TideData | null): DayData[] {
   const days: DayData[] = [];
@@ -33,14 +59,7 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
     const hourly = weather.hourly.filter(h => h.time.startsWith(prefix));
     if (hourly.length === 0) continue;
 
-    // Heures de jour uniquement (7h-21h)
-    const daytime = hourly.filter(h => {
-      const hr = new Date(h.time).getHours();
-      return hr >= 7 && hr <= 21;
-    });
-    const sample = daytime.length > 0 ? daytime : hourly;
-
-    // Hauteurs de marée par heure pour ce jour
+    // Hauteurs de marée par heure
     const tideByHour: Record<number, number> = {};
     if (tideData) {
       for (const p of tideData.points) {
@@ -50,46 +69,41 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
       }
     }
 
+    // Score par heure (7h–21h uniquement)
     const scoreByHour: Record<number, number> = {};
-    for (const h of sample) {
+    for (const h of hourly) {
       const hr = new Date(h.time).getHours();
+      if (hr < 7 || hr > 21) continue;
       scoreByHour[hr] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
     }
-    const scores = Object.values(scoreByHour);
 
-    // Fenêtre optimale consécutive >= 65
-    let best: { start: number; end: number; len: number } | null = null;
-    let i = 0;
-    while (i < 24) {
-      const s = scoreByHour[i];
-      if (s !== undefined && s >= 65) {
-        let j = i;
-        while (j < 24 && (scoreByHour[j] ?? -1) >= 65) j++;
-        const len = j - i;
-        if (!best || len > best.len) best = { start: i, end: j - 1, len };
-        i = j;
-      } else i++;
-    }
-
-    const minScore = Math.min(...scores);
-    const maxScore = Math.max(...scores);
+    const daytimeHourly = hourly.filter(h => {
+      const hr = new Date(h.time).getHours();
+      return hr >= 7 && hr <= 21;
+    });
+    const sample = daytimeHourly.length > 0 ? daytimeHourly : hourly;
     const avgWind = Math.round(sample.reduce((a, h) => a + h.windSpeed, 0) / sample.length);
     const maxWave = Math.max(...sample.map(h => h.waveHeight));
 
     days.push({
-      date, dayLabel: DAYS_FR[date.getDay()], dateNum: date.getDate(),
-      score: minScore, maxScore, avgWind, maxWave,
-      bestWindow: best ? { start: best.start, end: best.end } : null,
+      date,
+      dayLabel: DAYS_FR[date.getDay()],
+      dateNum: date.getDate(),
+      window: findBestWindow(scoreByHour),
+      avgWind,
+      maxWave,
     });
   }
   return days;
 }
 
-function scoreColors(s: number) {
-  if (s >= 75) return { bg: COLORS.go,   ink: COLORS.goInk,  label: 'Idéal' };
-  if (s >= 55) return { bg: '#d4edaa',   ink: '#3a5a1a',     label: 'Bon' };
-  if (s >= 35) return { bg: COLORS.warn,  ink: '#7a3d18',    label: 'Mitigé' };
-  return           { bg: COLORS.stop,    ink: '#fff',         label: 'Risqué' };
+function dayColor(day: DayData) {
+  const w = day.window;
+  if (!w) return { bg: COLORS.stop, ink: '#fff', label: 'Impossible' };
+  if (w.ideal && w.duration >= 3) return { bg: COLORS.go,   ink: COLORS.goInk, label: 'Bonne journée' };
+  if (w.ideal && w.duration >= 1) return { bg: '#d4edaa',   ink: '#3a5a1a',    label: 'Fenêtre courte' };
+  if (w.duration >= 3)            return { bg: COLORS.warn,  ink: '#7a3d18',   label: 'Conditions limites' };
+  return                               { bg: COLORS.stop,   ink: '#fff',        label: 'Très limité' };
 }
 
 interface Props {
@@ -118,12 +132,12 @@ export default function WeekScreen({ weatherData, tideData, boat, today, onNav, 
   }
 
   const day = days[selectedIdx];
-  const { bg, ink, label } = scoreColors(day.score);
+  const { bg, ink, label } = dayColor(day);
 
-  // Meilleures fenêtres globales (filtre sur maxScore pour ne pas exclure les bons jours à marée basse)
-  const windows = days
-    .filter(d => d.bestWindow && d.maxScore >= 55)
-    .sort((a, b) => b.maxScore - a.maxScore)
+  // Meilleures journées à mettre en avant
+  const highlights = days
+    .filter(d => d.window?.ideal && d.window.duration >= 1)
+    .sort((a, b) => (b.window?.duration ?? 0) - (a.window?.duration ?? 0))
     .slice(0, 3);
 
   return (
@@ -147,8 +161,9 @@ export default function WeekScreen({ weatherData, tideData, boat, today, onNav, 
         {/* Chips 7 jours */}
         <View style={styles.chips}>
           {days.map((d, i) => {
-            const c = scoreColors(d.score);
+            const c = dayColor(d);
             const sel = i === selectedIdx;
+            const dur = d.window?.duration ?? 0;
             return (
               <TouchableOpacity
                 key={i}
@@ -158,7 +173,9 @@ export default function WeekScreen({ weatherData, tideData, boat, today, onNav, 
               >
                 <Text style={[styles.chipDay, { color: sel ? '#fff' : c.ink }]}>{d.dayLabel}</Text>
                 <Text style={[styles.chipDate, { color: sel ? '#fff' : c.ink }]}>{d.dateNum}</Text>
-                <View style={[styles.chipBar, { backgroundColor: sel ? c.bg : 'rgba(0,0,0,0.15)', width: `${Math.max(20, d.score)}%` as any }]} />
+                <Text style={[styles.chipDur, { color: sel ? 'rgba(255,255,255,0.7)' : `${c.ink}99` }]}>
+                  {dur > 0 ? `${dur}h` : '—'}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -166,20 +183,33 @@ export default function WeekScreen({ weatherData, tideData, boat, today, onNav, 
 
         {/* Détail du jour sélectionné */}
         <View style={[styles.detailCard, { backgroundColor: bg }]}>
-          <View style={styles.detailTop}>
-            <View>
-              <Text style={[styles.detailDayLabel, { color: ink }]}>
-                {day.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </Text>
-              <Text style={[styles.detailLabel, { color: ink }]}>{label}</Text>
+          <Text style={[styles.detailDayLabel, { color: ink }]}>
+            {day.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+          </Text>
+          <Text style={[styles.detailLabel, { color: ink }]}>{label}</Text>
+
+          {day.window ? (
+            <View style={[styles.windowBox, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+              <Icon name="check" size={18} stroke={ink} strokeWidth={2.5} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.windowBoxTime, { color: ink }]}>
+                  {day.window.start}h00 — {day.window.end + 1}h00
+                </Text>
+                <Text style={[styles.windowBoxDur, { color: ink }]}>
+                  {day.window.duration}h de fenêtre {day.window.ideal ? 'idéale' : 'possible'}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.detailScore, { color: ink }]}>{day.score}</Text>
-          </View>
-          <View style={[styles.detailGrid, { borderTopColor: `rgba(0,0,0,0.1)` }]}>
+          ) : (
+            <View style={[styles.windowBox, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
+              <Text style={[styles.windowBoxDur, { color: ink }]}>Aucune fenêtre praticable</Text>
+            </View>
+          )}
+
+          <View style={[styles.detailGrid, { borderTopColor: 'rgba(0,0,0,0.1)', marginTop: 14 }]}>
             {[
               { label: 'Vent moy.', val: `${day.avgWind}`, unit: 'kn' },
               { label: 'Vagues max', val: `${day.maxWave.toFixed(1)}`, unit: 'm' },
-              { label: 'Meilleur', val: `${day.maxScore}`, unit: '/100' },
             ].map(({ label: l, val, unit }) => (
               <View key={l} style={{ flex: 1 }}>
                 <Text style={[styles.detailStatLabel, { color: ink }]}>{l}</Text>
@@ -189,45 +219,48 @@ export default function WeekScreen({ weatherData, tideData, boat, today, onNav, 
               </View>
             ))}
           </View>
-          {day.bestWindow && (
+
+          {day.window && (
             <TouchableOpacity
               style={styles.goBtn}
               onPress={() => { onSelectDate(day.date); onNav('home'); }}
               activeOpacity={0.85}
             >
-              <Text style={styles.goBtnTxt}>
-                Fenêtre {day.bestWindow.start}h–{day.bestWindow.end}h · Voir le détail →
-              </Text>
+              <Text style={styles.goBtnTxt}>Voir le détail →</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Meilleures fenêtres */}
-        <Text style={styles.sectionLabel}>Meilleures fenêtres</Text>
-        {windows.map((w, i) => {
-          const c = scoreColors(w.maxScore);
-          return (
-            <TouchableOpacity
-              key={i}
-              style={styles.windowCard}
-              onPress={() => { onSelectDate(w.date); onNav('home'); }}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.windowBadge, { backgroundColor: c.bg }]}>
-                <Text style={[styles.windowBadgeTxt, { color: c.ink }]}>{w.maxScore}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.windowTitle}>
-                  {w.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })}
-                </Text>
-                <Text style={styles.windowSub}>
-                  {w.bestWindow ? `${w.bestWindow.start}h — ${w.bestWindow.end}h` : ''} · {w.avgWind} kn · {w.maxWave.toFixed(1)} m
-                </Text>
-              </View>
-              <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
-            </TouchableOpacity>
-          );
-        })}
+        {/* Meilleures journées */}
+        {highlights.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>Meilleures journées</Text>
+            {highlights.map((w, i) => {
+              const c = dayColor(w);
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={styles.windowCard}
+                  onPress={() => { onSelectDate(w.date); onNav('home'); }}
+                  activeOpacity={0.8}
+                >
+                  <View style={[styles.windowBadge, { backgroundColor: c.bg }]}>
+                    <Text style={[styles.windowBadgeTxt, { color: c.ink }]}>{w.window?.duration}h</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.windowTitle}>
+                      {w.date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' })}
+                    </Text>
+                    <Text style={styles.windowSub}>
+                      {w.window ? `${w.window.start}h — ${w.window.end + 1}h` : ''} · {w.avgWind} kn · {w.maxWave.toFixed(1)} m
+                    </Text>
+                  </View>
+                  <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        )}
       </ScrollView>
 
       <NavFade active="week" onChange={onNav} />
@@ -244,27 +277,28 @@ const styles = StyleSheet.create({
   heading:   { fontSize: 32, fontFamily: FONTS.display, color: COLORS.ink, marginBottom: 4, marginTop: 8, marginHorizontal: 4 },
   subHeading:{ fontSize: 14, fontFamily: FONTS.regular, color: COLORS.ink3, marginBottom: 18, marginHorizontal: 4 },
 
-  chips: { flexDirection: 'row', gap: 6, marginBottom: 22 },
-  chip:  { flex: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)' },
-  chipDay: { fontSize: 9, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.7 },
-  chipDate:{ fontSize: 18, fontFamily: FONTS.display, marginTop: 4, lineHeight: 20 },
-  chipBar: { marginTop: 6, height: 4, borderRadius: 2, alignSelf: 'center' },
+  chips:    { flexDirection: 'row', gap: 6, marginBottom: 22 },
+  chip:     { flex: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 4, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(0,0,0,0.04)' },
+  chipDay:  { fontSize: 9, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.7 },
+  chipDate: { fontSize: 18, fontFamily: FONTS.display, marginTop: 4, lineHeight: 20 },
+  chipDur:  { fontSize: 10, fontFamily: FONTS.semiBold, marginTop: 4 },
 
-  detailCard: { borderRadius: 28, padding: 22, marginBottom: 22 },
-  detailTop:  { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },
-  detailDayLabel:{ fontSize: 11, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.65, marginBottom: 6 },
-  detailLabel:   { fontSize: 28, fontFamily: FONTS.display, lineHeight: 30 },
-  detailScore:   { fontSize: 44, fontFamily: FONTS.display, lineHeight: 44, opacity: 0.9 },
-  detailGrid:    { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1 },
+  detailCard:     { borderRadius: 28, padding: 22, marginBottom: 22 },
+  detailDayLabel: { fontSize: 11, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.65, marginBottom: 6 },
+  detailLabel:    { fontSize: 28, fontFamily: FONTS.display, lineHeight: 32, marginBottom: 16 },
+  windowBox:      { borderRadius: 16, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  windowBoxTime:  { fontSize: 20, fontFamily: FONTS.display },
+  windowBoxDur:   { fontSize: 13, fontFamily: FONTS.regular, opacity: 0.8, marginTop: 2 },
+  detailGrid:     { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1 },
   detailStatLabel:{ fontSize: 10, fontFamily: FONTS.semiBold, opacity: 0.6, letterSpacing: 0.1, textTransform: 'uppercase' },
   detailStatVal:  { fontSize: 18, fontFamily: FONTS.display, marginTop: 4 },
-  goBtn:         { marginTop: 14, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 12, padding: 12, alignItems: 'center' },
-  goBtnTxt:      { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  goBtn:          { marginTop: 14, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 12, padding: 12, alignItems: 'center' },
+  goBtnTxt:       { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
 
-  sectionLabel:  { fontSize: 11, fontFamily: FONTS.semiBold, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 0.12, marginBottom: 12 },
-  windowCard:    { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.hairline },
-  windowBadge:   { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  windowBadgeTxt:{ fontSize: 16, fontFamily: FONTS.display, fontWeight: '600' },
-  windowTitle:   { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  windowSub:     { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
+  sectionLabel:   { fontSize: 11, fontFamily: FONTS.semiBold, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 0.12, marginBottom: 12 },
+  windowCard:     { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.hairline },
+  windowBadge:    { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  windowBadgeTxt: { fontSize: 16, fontFamily: FONTS.display, fontWeight: '600' },
+  windowTitle:    { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  windowSub:      { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
 });
