@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
-import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings } from '../types';
+import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings, VerdictLevel } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
 import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
-import { assessLevel } from '../utils/verdictCalculator';
+import { assessLevel, assessWeatherLevel, assessTideLevel, worstLevel, smoothTideLevels } from '../utils/verdictCalculator';
 
 interface Props {
   port: Port;
@@ -107,8 +107,25 @@ function buildTimelineData(
   tideData: TideData | null,
   boat: BoatSettings
 ): { scores: number[]; tideHeights: number[] } {
-  const scores: number[] = [];
   const tideHeights: number[] = [];
+  const rawTideLevels: VerdictLevel[] = [];
+
+  for (let i = 0; i < totalHours; i++) {
+    const d = new Date(startMs + i * 3600000);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const prefix = `${y}-${m}-${dd}T${hh}`;
+    const tp = tideData?.points.find(p => p.time.startsWith(prefix));
+    const tideH = tp?.height ?? null;
+    tideHeights.push(tideH ?? 0);
+    rawTideLevels.push(tideH !== null && tideH > 0 ? assessTideLevel(tideH, boat.draft) : 'green');
+  }
+
+  const smoothedTide = smoothTideLevels(rawTideLevels);
+
+  const scores: number[] = [];
   for (let i = 0; i < totalHours; i++) {
     const d = new Date(startMs + i * 3600000);
     const y = d.getFullYear();
@@ -117,12 +134,11 @@ function buildTimelineData(
     const hh = String(d.getHours()).padStart(2, '0');
     const prefix = `${y}-${m}-${dd}T${hh}`;
     const w = weatherData.hourly.find(x => x.time.startsWith(prefix));
-    const tp = tideData?.points.find(p => p.time.startsWith(prefix));
-    const tideH = tp?.height ?? null;
-    const lvl = w ? assessLevel(w.windSpeed, w.windGust, w.waveHeight, boat, tideH ?? undefined) : 'orange';
-    scores.push(lvl === 'green' ? 90 : lvl === 'orange' ? 50 : 10);
-    tideHeights.push(tideH ?? 0);
+    const weatherLvl = w ? assessWeatherLevel(w.windSpeed, w.windGust, w.waveHeight, boat) : 'orange';
+    const combined = worstLevel(weatherLvl, smoothedTide[i]);
+    scores.push(combined === 'green' ? 90 : combined === 'orange' ? 50 : 10);
   }
+
   return { scores, tideHeights };
 }
 

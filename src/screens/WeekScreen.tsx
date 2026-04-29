@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
-import { WeatherData, TideData, BoatSettings } from '../types';
-import { assessLevel } from '../utils/verdictCalculator';
+import { WeatherData, TideData, BoatSettings, VerdictLevel } from '../types';
+import { assessWeatherLevel, assessTideLevel, worstLevel, smoothTideLevels } from '../utils/verdictCalculator';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
@@ -73,13 +73,21 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
       }
     }
 
+    // Niveaux marée bruts (24h) puis lissés
+    const rawTide: VerdictLevel[] = Array.from({ length: 24 }, (_, i) => {
+      const h = tideByHour[i];
+      return h !== undefined && h > 0 ? assessTideLevel(h, boat.draft) : 'green';
+    });
+    const smoothedTide = smoothTideLevels(rawTide);
+
     // Score par heure (heures de jour uniquement)
     const scoreByHour: Record<number, number> = {};
     for (const h of hourly) {
       const hr = new Date(h.time).getHours();
       if (hr < dayStart || hr > dayEnd) continue;
-      const lvl = assessLevel(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
-      scoreByHour[hr] = lvl === 'green' ? 90 : lvl === 'orange' ? 50 : 10;
+      const weatherLvl = assessWeatherLevel(h.windSpeed, h.windGust, h.waveHeight, boat);
+      const combined = worstLevel(weatherLvl, smoothedTide[hr]);
+      scoreByHour[hr] = combined === 'green' ? 90 : combined === 'orange' ? 50 : 10;
     }
 
     const daytimeHourly = hourly.filter(h => {
