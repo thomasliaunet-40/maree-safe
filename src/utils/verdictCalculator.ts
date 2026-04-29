@@ -60,7 +60,10 @@ function buildTideByHour(points: TidePoint[], dayPrefix: string): Record<number,
   for (const p of points) {
     if (!p.time.startsWith(dayPrefix)) continue;
     const hour = parseInt(p.time.split('T')[1]?.slice(0, 2) ?? '0', 10);
-    if (!isNaN(hour)) map[hour] = p.height;
+    if (!isNaN(hour)) {
+      // Minimum de l'heure (pire cas sur les 10 min)
+      map[hour] = map[hour] !== undefined ? Math.min(map[hour], p.height) : p.height;
+    }
   }
   return map;
 }

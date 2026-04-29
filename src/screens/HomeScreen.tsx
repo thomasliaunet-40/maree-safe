@@ -91,12 +91,14 @@ function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): H
 }
 
 
-function findTideHeight(points: TideData['points'], hour: number, date: Date): number | null {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const prefix = `${y}-${m}-${d}T${String(hour).padStart(2, '0')}`;
-  return points.find(p => p.time.startsWith(prefix))?.height ?? null;
+function findTideHeightAtMs(points: TideData['points'], ms: number): number | null {
+  let best: number | null = null;
+  let bestDiff = Infinity;
+  for (const p of points) {
+    const diff = Math.abs(new Date(p.time).getTime() - ms);
+    if (diff < bestDiff) { bestDiff = diff; best = p.height; }
+  }
+  return best;
 }
 
 // Calcule scores + hauteurs marée sur une fenêtre de N heures à partir d'un timestamp
@@ -117,10 +119,14 @@ function buildTimelineData(
     const dd = String(d.getDate()).padStart(2, '0');
     const hh = String(d.getHours()).padStart(2, '0');
     const prefix = `${y}-${m}-${dd}T${hh}`;
-    const tp = tideData?.points.find(p => p.time.startsWith(prefix));
-    const tideH = tp?.height ?? null;
-    tideHeights.push(tideH ?? 0);
-    rawTideLevels.push(tideH !== null && tideH > 0 ? assessTideLevel(tideH, boat.draft) : 'green');
+    // Tous les points 10 min dans cette heure
+    const hourPts = tideData?.points.filter(p => p.time.startsWith(prefix)) ?? [];
+    // Hauteur pour la courbe : valeur au début de l'heure (premier point)
+    const curveH = hourPts[0]?.height ?? null;
+    // Hauteur pour le score : minimum de l'heure (pire cas)
+    const minH = hourPts.length > 0 ? Math.min(...hourPts.map(p => p.height)) : null;
+    tideHeights.push(curveH ?? 0);
+    rawTideLevels.push(minH !== null && minH > 0 ? assessTideLevel(minH, boat.draft) : 'green');
   }
 
   const smoothedTide = smoothTideLevels(rawTideLevels);
@@ -215,9 +221,9 @@ export default function HomeScreen({
   const displayGust  = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
   const displayWaveH = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
   const displayTideH = tideData ? (() => {
-    if (scrubOffset !== null) return findTideHeight(tideData.points, displayHourInt, displayDate) ?? tideData.currentHeight;
+    if (scrubOffset !== null) return findTideHeightAtMs(tideData.points, displayMs) ?? tideData.currentHeight;
     if (isToday) return tideData.currentHeight;
-    return findTideHeight(tideData.points, hour, selectedDate) ?? 0;
+    return findTideHeightAtMs(tideData.points, new Date(selectedDate).setHours(hour, 0, 0, 0)) ?? 0;
   })() : 0;
 
   const displayLevel = assessLevel(displayWind, displayGust, displayWaveH, boat, displayTideH > 0 ? displayTideH : undefined);

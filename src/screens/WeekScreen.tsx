@@ -69,7 +69,8 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
       for (const p of tideData.points) {
         if (!p.time.startsWith(prefix)) continue;
         const hr = parseInt(p.time.split('T')[1]?.slice(0, 2) ?? '0', 10);
-        tideByHour[hr] = p.height;
+        // Minimum de l'heure (pire cas sur les 10 min)
+        tideByHour[hr] = tideByHour[hr] !== undefined ? Math.min(tideByHour[hr], p.height) : p.height;
       }
     }
 
