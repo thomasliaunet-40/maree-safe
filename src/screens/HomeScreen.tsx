@@ -326,59 +326,6 @@ export default function HomeScreen({
               );
             })()}
 
-            {/* 3 KPI cards */}
-            {weatherData && (
-              <View style={styles.kpiRow}>
-                {/* Marée */}
-                <TouchableOpacity style={[styles.kpiCard, styles.kpiTide]} onPress={() => onNav('tide')} activeOpacity={0.85}>
-                  <View style={styles.kpiHeader}>
-                    <Icon name="wave" size={18} stroke={COLORS.tideInk} />
-                    <Text style={[styles.kpiTag, { color: COLORS.tideInk }]}>
-                      {nextTide?.type === 'high' ? 'Pleine mer' : 'Basse mer'}
-                    </Text>
-                  </View>
-                  <Text style={[styles.kpiValue, { color: COLORS.tideInk }]}>
-                    {nextTide?.height.toFixed(1) ?? '—'}
-                    <Text style={styles.kpiUnit}>m</Text>
-                  </Text>
-                  <Text style={[styles.kpiSub, { color: COLORS.tideInk }]}>
-                    {nextTide ? `à ${nextTide.time.split('T')[1]?.slice(0, 5)}` : ''}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Vent */}
-                <View style={[styles.kpiCard, styles.kpiSand]}>
-                  <View style={styles.kpiHeader}>
-                    <Icon name="wind" size={18} stroke={COLORS.sandInk} />
-                    <Text style={[styles.kpiTag, { color: COLORS.sandInk }]}>
-                      Vent {degreesToCompass(weatherData.windDirection)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.kpiValue, { color: COLORS.sandInk }]}>
-                    {Math.round(weatherData.windSpeed)}
-                    <Text style={styles.kpiUnit}>kn</Text>
-                  </Text>
-                  <Text style={[styles.kpiSub, { color: COLORS.sandInk }]}>
-                    raf. {Math.round(weatherData.windGust)} kn
-                  </Text>
-                </View>
-
-                {/* Coef */}
-                <TouchableOpacity style={[styles.kpiCard, styles.kpiLilac]} onPress={() => onNav('tide')} activeOpacity={0.85}>
-                  <View style={styles.kpiHeader}>
-                    <Icon name="anchor" size={18} stroke={COLORS.lilacInk} />
-                    <Text style={[styles.kpiTag, { color: COLORS.lilacInk }]}>Coef.</Text>
-                  </View>
-                  <Text style={[styles.kpiValue, { color: COLORS.lilacInk }]}>
-                    {tideData?.coefficient ?? '—'}
-                  </Text>
-                  <Text style={[styles.kpiSub, { color: COLORS.lilacInk }]}>
-                    {(tideData?.coefficient ?? 0) >= 95 ? 'grandes vives-eaux'
-                      : (tideData?.coefficient ?? 0) >= 70 ? 'vives-eaux' : 'mortes-eaux'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
 
             {/* État de la mer */}
             {weatherData && (
@@ -488,18 +435,6 @@ const styles = StyleSheet.create({
   condHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   condTitle:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
   condRows:   { gap: 6 },
-
-  // KPI row
-  kpiRow:  { flexDirection: 'row', gap: 10, marginBottom: 14 },
-  kpiCard: { flex: 1, borderRadius: 28, padding: 16 },
-  kpiTide: { backgroundColor: COLORS.tide },
-  kpiSand: { backgroundColor: COLORS.sand },
-  kpiLilac:{ backgroundColor: COLORS.lilac },
-  kpiHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  kpiTag:  { fontSize: 9, fontFamily: FONTS.bold, letterSpacing: 0.1, textTransform: 'uppercase', opacity: 0.6 },
-  kpiValue:{ fontSize: 26, fontFamily: FONTS.display, lineHeight: 28 },
-  kpiUnit: { fontSize: 13, opacity: 0.6 },
-  kpiSub:  { fontSize: 11, fontFamily: FONTS.regular, opacity: 0.7, marginTop: 4 },
 
   // État de la mer
   seaCard:     { backgroundColor: COLORS.ink, borderRadius: 28, padding: 18, marginBottom: 14 },
