@@ -3,12 +3,10 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator
 import { TideData, WeatherData, HourlyWeather, VerdictResult, Port, BoatSettings } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
-import { degreesToCompass } from '../utils/windDirection';
 import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
 import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
-import Compass from '../components/Compass';
 import { computeScore } from '../utils/verdictCalculator';
 
 interface Props {
@@ -304,66 +302,6 @@ export default function HomeScreen({
               ) : null; })()}
             </View>
 
-            {/* Conditions vs seuils — barres pleine largeur, triées par sévérité */}
-            {weatherData && (() => {
-              const conditions = [
-                { icon: 'wind'   as const, label: 'Vent',         value: `${Math.round(displayWind)} kn`,    sub: `max ${boat.maxWind} kn`,   ratio: displayWind / boat.maxWind },
-                { icon: 'wave'   as const, label: 'Vagues',       value: `${displayWaveH.toFixed(1)} m`,     sub: `max ${boat.maxWaves} m`,   ratio: displayWaveH / boat.maxWaves },
-                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH }] : []),
-              ].sort((a, b) => b.ratio - a.ratio);
-              return (
-                <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
-                  <View style={styles.condHeader}>
-                    <Text style={styles.condTitle}>Conditions vs mes seuils</Text>
-                    <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
-                  </View>
-                  <View style={styles.condRows}>
-                    {conditions.map(c => (
-                      <ConditionBar key={c.label} {...c} />
-                    ))}
-                  </View>
-                </TouchableOpacity>
-              );
-            })()}
-
-
-            {/* État de la mer */}
-            {weatherData && (
-              <View style={styles.seaCard}>
-                <View style={styles.seaTop}>
-                  <View>
-                    <Text style={styles.seaTag}>État de la mer</Text>
-                    <Text style={styles.seaLabel}>
-                      {weatherData.waveHeight > 2.5 ? 'Mer agitée'
-                        : weatherData.waveHeight > 1.5 ? 'Mer formée'
-                        : weatherData.waveHeight > 0.5 ? 'Belle mer'
-                        : 'Mer calme'}
-                    </Text>
-                  </View>
-                  <Compass deg={weatherData.windDirection} size={56} color="#fff" bg="rgba(255,255,255,0.12)" />
-                </View>
-                <View style={styles.seaGrid}>
-                  <View>
-                    <Text style={styles.seaStatLabel}>Vagues</Text>
-                    <Text style={styles.seaStatValue}>
-                      {weatherData.waveHeight.toFixed(1)}<Text style={styles.seaStatUnit}>m</Text>
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.seaStatLabel}>Rafales</Text>
-                    <Text style={styles.seaStatValue}>
-                      {Math.round(weatherData.windGust)}<Text style={styles.seaStatUnit}>kn</Text>
-                    </Text>
-                  </View>
-                  <View>
-                    <Text style={styles.seaStatLabel}>Direction</Text>
-                    <Text style={styles.seaStatValue}>
-                      {degreesToCompass(weatherData.windDirection)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
 
             {/* Action cards */}
             <TouchableOpacity style={styles.planCard} onPress={() => onNav('week')} activeOpacity={0.85}>
@@ -429,22 +367,6 @@ const styles = StyleSheet.create({
   windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
   windowSep:    { marginTop: 4 },
-
-  // Conditions vs seuils
-  condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
-  condHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  condTitle:  { fontSize: 10, fontFamily: FONTS.bold, letterSpacing: 0.12, textTransform: 'uppercase', color: COLORS.ink3 },
-  condRows:   { gap: 6 },
-
-  // État de la mer
-  seaCard:     { backgroundColor: COLORS.ink, borderRadius: 28, padding: 18, marginBottom: 14 },
-  seaTop:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 },
-  seaTag:      { fontSize: 11, color: 'rgba(255,255,255,0.6)', fontFamily: FONTS.semiBold, letterSpacing: 0.12, textTransform: 'uppercase' },
-  seaLabel:    { fontSize: 24, fontFamily: FONTS.display, color: '#fff', marginTop: 6 },
-  seaGrid:     { flexDirection: 'row', paddingTop: 14, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.12)' },
-  seaStatLabel:{ fontSize: 9, color: 'rgba(255,255,255,0.5)', fontFamily: FONTS.semiBold, letterSpacing: 0.1, textTransform: 'uppercase', flex: 1 },
-  seaStatValue:{ fontSize: 19, fontFamily: FONTS.display, color: '#fff', marginTop: 4 },
-  seaStatUnit: { fontSize: 11, opacity: 0.6 },
 
   // Action cards
   planCard: { backgroundColor: '#f4c98d', borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
