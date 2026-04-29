@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   verdictCard:  { borderRadius: 28, paddingTop: 28, paddingHorizontal: 24, paddingBottom: 24, marginBottom: 14 },
   verdictTime:  { fontSize: 20, fontFamily: FONTS.display, letterSpacing: -0.3, opacity: 0.85, marginBottom: 10, textAlign: 'center' },
   verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, textAlign: 'center' },
-  coefLine:     { fontSize: 11, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
+  coefLine:     { fontSize: 33, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
   windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 18, padding: 14 },
   windowIcon:   { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   windowLabel:  { fontSize: 12, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
