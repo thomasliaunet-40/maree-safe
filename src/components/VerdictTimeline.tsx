@@ -1,6 +1,6 @@
 import React, { useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import Svg, { Rect, Path, Line } from 'react-native-svg';
+import Svg, { Rect, Path, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
 import { COLORS } from '../constants/colors';
 
@@ -8,11 +8,21 @@ const PPH = 42; // pixels per hour
 const SVG_H = 84;
 const TICK_H = 22;
 
+function lerpColor(a: string, b: string, t: number): string {
+  const ah = parseInt(a.slice(1), 16);
+  const bh = parseInt(b.slice(1), 16);
+  const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, abl = ah & 0xff;
+  const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bbl = bh & 0xff;
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(abl + (bbl - abl) * t);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${bl.toString(16).padStart(2, '0')}`;
+}
+
 function scoreToColor(s: number): string {
-  if (s >= 75) return '#8fc8a3';
-  if (s >= 55) return '#c0d99a';
-  if (s >= 35) return '#f3b96b';
-  return '#e88a82';
+  // Interpolation continue : 10=rouge, 50=orange, 90=vert
+  if (s >= 50) return lerpColor('#f3b96b', '#8fc8a3', Math.min(1, (s - 50) / 40));
+  return lerpColor('#e88a82', '#f3b96b', Math.max(0, (s - 10) / 40));
 }
 
 export interface VerdictTimelineHandle {
@@ -82,9 +92,19 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
           {/* Contenu scrollable : barres + marée + repères */}
           <View style={{ width: contentWidth, height: SVG_H + TICK_H }}>
             <Svg width={contentWidth} height={SVG_H}>
-              {scores.map((score, i) => (
-                <Rect key={i} x={i * PPH} y={0} width={PPH + 1} height={SVG_H} fill={scoreToColor(score)} />
-              ))}
+              <Defs>
+                <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
+                  {scores.map((score, i) => (
+                    <Stop
+                      key={i}
+                      offset={`${((i + 0.5) / totalHours * 100).toFixed(2)}%`}
+                      stopColor={scoreToColor(score)}
+                      stopOpacity={1}
+                    />
+                  ))}
+                </LinearGradient>
+              </Defs>
+              <Rect x={0} y={0} width={contentWidth} height={SVG_H} fill="url(#grad)" />
               {hasTide && (
                 <Path
                   d={tidePath}
