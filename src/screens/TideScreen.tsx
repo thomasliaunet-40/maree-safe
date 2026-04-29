@@ -39,7 +39,13 @@ export default function TideScreen({ tideData, selectedDate, onNav }: Props) {
   const SVG_H = 200;
   const PAD_L = 8, PAD_R = 8, PAD_T = 14, PAD_B = 28;
 
-  const points = tideData?.points ?? [];
+  const allPoints = tideData?.points ?? [];
+  const points = allPoints.filter(p => {
+    const d = new Date(p.time);
+    return d.getFullYear() === selectedDate.getFullYear() &&
+           d.getMonth()    === selectedDate.getMonth()    &&
+           d.getDate()     === selectedDate.getDate();
+  });
   const heights = points.map(p => p.height);
   const minH = heights.length ? Math.min(...heights) : 0;
   const maxH = heights.length ? Math.max(...heights) : 6;
