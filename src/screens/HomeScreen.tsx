@@ -32,7 +32,7 @@ const COND_PALETTE = {
 
 function condLevel(ratio: number): keyof typeof COND_PALETTE {
   if (ratio >= 1.0) return 'red';
-  if (ratio >= 0.8) return 'orange';
+  if (ratio >= 0.67) return 'orange';
   return 'green';
 }
 
