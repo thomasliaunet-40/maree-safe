@@ -8,7 +8,6 @@ export type Screen = 'home' | 'week' | 'ports' | 'tide' | 'boat';
 const ITEMS: { id: Screen; icon: React.ComponentProps<typeof Icon>['name'] }[] = [
   { id: 'home',  icon: 'home' },
   { id: 'week',  icon: 'calendar' },
-  { id: 'ports', icon: 'map' },
   { id: 'tide',  icon: 'wave' },
   { id: 'boat',  icon: 'settings' },
 ];
