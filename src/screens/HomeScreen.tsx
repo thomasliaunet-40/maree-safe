@@ -302,6 +302,25 @@ export default function HomeScreen({
               ) : null; })()}
             </View>
 
+            {/* Conditions vs seuils */}
+            {weatherData && (() => {
+              const conditions = [
+                { icon: 'wind'   as const, label: 'Vent',         value: `${Math.round(displayWind)} kn`,  sub: `max ${boat.maxWind} kn`,  ratio: displayWind / boat.maxWind },
+                { icon: 'wave'   as const, label: 'Vagues',       value: `${displayWaveH.toFixed(1)} m`,   sub: `max ${boat.maxWaves} m`,  ratio: displayWaveH / boat.maxWaves },
+                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH }] : []),
+              ].sort((a, b) => b.ratio - a.ratio);
+              return (
+                <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>
+                  <View style={styles.condHeader}>
+                    <Text style={styles.condTitle}>Conditions vs mes seuils</Text>
+                    <Icon name="chevronRight" size={16} stroke={COLORS.ink4} />
+                  </View>
+                  <View style={styles.condRows}>
+                    {conditions.map(c => <ConditionBar key={c.label} {...c} />)}
+                  </View>
+                </TouchableOpacity>
+              );
+            })()}
 
             {/* Action cards */}
             <TouchableOpacity style={styles.planCard} onPress={() => onNav('week')} activeOpacity={0.85}>
@@ -313,17 +332,6 @@ export default function HomeScreen({
                 <Text style={styles.planSub}>Vue 7 jours · fenêtres détectées</Text>
               </View>
               <Icon name="chevronRight" size={18} stroke="rgba(255,255,255,0.5)" />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.boatCard} onPress={() => onNav('boat')} activeOpacity={0.85}>
-              <View style={styles.boatIcon}>
-                <Icon name="boat" size={18} stroke={COLORS.ink2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.boatTitle}>{boat.name}</Text>
-                <Text style={styles.boatSub}>Seuils : {boat.maxWind} kn · {boat.maxWaves} m</Text>
-              </View>
-              <Icon name="chevronRight" size={18} stroke={COLORS.ink4} />
             </TouchableOpacity>
 
             {/* Erreurs */}
@@ -368,16 +376,17 @@ const styles = StyleSheet.create({
   windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
   windowSep:    { marginTop: 4 },
 
+  // Conditions card
+  condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 20, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
+  condHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  condTitle:  { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  condRows:   { gap: 8 },
+
   // Action cards
   planCard: { backgroundColor: '#f4c98d', borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
   planIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#6c9ca0', alignItems: 'center', justifyContent: 'center' },
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
   planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
-
-  boatCard: { backgroundColor: COLORS.paper, borderRadius: 28, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 14, borderWidth: 1, borderColor: COLORS.hairline },
-  boatIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.paperSoft, alignItems: 'center', justifyContent: 'center' },
-  boatTitle:{ fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  boatSub:  { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
 
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });
