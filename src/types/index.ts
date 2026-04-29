@@ -44,6 +44,8 @@ export interface WeatherData {
   waveHeight: number;
   waveDirection: number;
   hourly: HourlyWeather[];
+  // clé = "YYYY-MM-DD", valeur = heure décimale (ex: 6.7 = 6h42)
+  sunriseSunset: Record<string, { sunrise: number; sunset: number }>;
 }
 
 export type VerdictLevel = 'green' | 'orange' | 'red';

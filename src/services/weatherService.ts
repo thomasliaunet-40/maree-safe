@@ -10,6 +10,7 @@ export async function fetchWeatherData(port: Port): Promise<WeatherData> {
     `${FORECAST_URL}?latitude=${lat}&longitude=${lng}` +
     `&current=wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
     `&hourly=wind_speed_10m,wind_direction_10m,wind_gusts_10m` +
+    `&daily=sunrise,sunset` +
     `&wind_speed_unit=kn` +
     `&timezone=Europe%2FParis` +
     `&forecast_days=9`;
@@ -62,6 +63,23 @@ export async function fetchWeatherData(port: Port): Promise<WeatherData> {
     waveDirection: hourlyWaveDirections[i] ?? 0,
   }));
 
+  // Lever/coucher de soleil par jour
+  const sunriseSunset: Record<string, { sunrise: number; sunset: number }> = {};
+  const dailyTimes: string[] = wind.daily?.time ?? [];
+  const dailySunrise: string[] = wind.daily?.sunrise ?? [];
+  const dailySunset: string[] = wind.daily?.sunset ?? [];
+  const toHour = (iso: string) => {
+    const t = iso.split('T')[1] ?? '00:00';
+    const [h, m] = t.split(':').map(Number);
+    return h + (m ?? 0) / 60;
+  };
+  dailyTimes.forEach((date, i) => {
+    sunriseSunset[date] = {
+      sunrise: toHour(dailySunrise[i] ?? ''),
+      sunset:  toHour(dailySunset[i]  ?? ''),
+    };
+  });
+
   return {
     windSpeed: currentWind.wind_speed_10m ?? 0,
     windGust: currentWind.wind_gusts_10m ?? 0,
@@ -69,5 +87,6 @@ export async function fetchWeatherData(port: Port): Promise<WeatherData> {
     waveHeight: currentWaveHeight,
     waveDirection: currentWaveDirection,
     hourly,
+    sunriseSunset,
   };
 }

@@ -25,15 +25,14 @@ interface DayData {
 
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
-function findBestWindow(scoreByHour: Record<number, number>): Window | null {
-  // Cherche d'abord une fenêtre idéale (>= 65), sinon possible (>= 35)
+function findBestWindow(scoreByHour: Record<number, number>, dayStart: number, dayEnd: number): Window | null {
   for (const threshold of [65, 35] as const) {
     let best: { start: number; end: number; len: number } | null = null;
-    let i = 7;
-    while (i <= 21) {
+    let i = dayStart;
+    while (i <= dayEnd) {
       if ((scoreByHour[i] ?? -1) >= threshold) {
         let j = i;
-        while (j <= 21 && (scoreByHour[j] ?? -1) >= threshold) j++;
+        while (j <= dayEnd && (scoreByHour[j] ?? -1) >= threshold) j++;
         const len = j - i;
         if (!best || len > best.len) best = { start: i, end: j - 1, len };
         i = j;
@@ -59,6 +58,11 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
     const hourly = weather.hourly.filter(h => h.time.startsWith(prefix));
     if (hourly.length === 0) continue;
 
+    // Heures de jour réelles (lever/coucher de soleil, fallback 7h–21h)
+    const sun = weather.sunriseSunset[prefix];
+    const dayStart = sun ? Math.ceil(sun.sunrise) : 7;
+    const dayEnd   = sun ? Math.floor(sun.sunset)  : 21;
+
     // Hauteurs de marée par heure
     const tideByHour: Record<number, number> = {};
     if (tideData) {
@@ -69,17 +73,17 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
       }
     }
 
-    // Score par heure (7h–21h uniquement)
+    // Score par heure (heures de jour uniquement)
     const scoreByHour: Record<number, number> = {};
     for (const h of hourly) {
       const hr = new Date(h.time).getHours();
-      if (hr < 7 || hr > 21) continue;
+      if (hr < dayStart || hr > dayEnd) continue;
       scoreByHour[hr] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
     }
 
     const daytimeHourly = hourly.filter(h => {
       const hr = new Date(h.time).getHours();
-      return hr >= 7 && hr <= 21;
+      return hr >= dayStart && hr <= dayEnd;
     });
     const sample = daytimeHourly.length > 0 ? daytimeHourly : hourly;
     const avgWind = Math.round(sample.reduce((a, h) => a + h.windSpeed, 0) / sample.length);
@@ -89,7 +93,7 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
       date,
       dayLabel: DAYS_FR[date.getDay()],
       dateNum: date.getDate(),
-      window: findBestWindow(scoreByHour),
+      window: findBestWindow(scoreByHour, dayStart, dayEnd),
       avgWind,
       maxWave,
     });
