@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { WeatherData, TideData, BoatSettings } from '../types';
-import { computeScore } from '../utils/verdictCalculator';
+import { assessLevel } from '../utils/verdictCalculator';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
@@ -26,7 +26,7 @@ interface DayData {
 const DAYS_FR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
 function findBestWindow(scoreByHour: Record<number, number>, dayStart: number, dayEnd: number): Window | null {
-  for (const threshold of [65, 35] as const) {
+  for (const threshold of [80, 30] as const) {
     let best: { start: number; end: number; len: number } | null = null;
     let i = dayStart;
     while (i <= dayEnd) {
@@ -39,7 +39,7 @@ function findBestWindow(scoreByHour: Record<number, number>, dayStart: number, d
       } else i++;
     }
     if (best && best.len >= 1) {
-      return { start: best.start, end: best.end, duration: best.len, ideal: threshold === 65 };
+      return { start: best.start, end: best.end, duration: best.len, ideal: threshold === 80 };
     }
   }
   return null;
@@ -78,7 +78,8 @@ function computeDailyData(weather: WeatherData, boat: BoatSettings, today: Date,
     for (const h of hourly) {
       const hr = new Date(h.time).getHours();
       if (hr < dayStart || hr > dayEnd) continue;
-      scoreByHour[hr] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
+      const lvl = assessLevel(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hr]);
+      scoreByHour[hr] = lvl === 'green' ? 90 : lvl === 'orange' ? 50 : 10;
     }
 
     const daytimeHourly = hourly.filter(h => {

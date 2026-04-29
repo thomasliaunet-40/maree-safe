@@ -1,52 +1,35 @@
 import { WeatherData, HourlyWeather, VerdictLevel, VerdictResult, BoatSettings, BOAT_DEFAULT, TideData, TidePoint } from '../types';
 
-// Score 0–100 basé sur les seuils du voilier (+ hauteur d'eau optionnelle)
-export function computeScore(
+// Règle simple : vert / orange / rouge selon les seuils du bateau
+export function assessLevel(
   windSpeed: number,
   windGust: number,
   waveHeight: number,
   boat: BoatSettings = BOAT_DEFAULT,
   tideHeight?: number
-): number {
-  const windR = windSpeed / boat.maxWind;
-  const gustR = windGust / (boat.maxWind * 1.3);
-  const waveR = waveHeight / boat.maxWaves;
+): VerdictLevel {
+  // Rouge : au moins une limite dépassée
+  if (windSpeed >= boat.maxWind) return 'red';
+  if (windGust >= boat.maxWind * 1.3) return 'red';
+  if (waveHeight >= boat.maxWaves) return 'red';
+  if (tideHeight !== undefined && tideHeight > 0 && tideHeight < boat.draft) return 'red';
 
-  if (tideHeight !== undefined && tideHeight > 0) {
-    const draftR = boat.draft / tideHeight;
-    // Bateau échoué ou eau insuffisante → impossible
-    if (draftR >= 1.0) return 0;
-    // Normalise : marge de 15% = "à la limite" (équivalent windR=1.0)
-    const tideR = draftR / 0.85;
-    const worst = Math.max(windR, gustR, waveR, tideR);
-    return Math.round(Math.max(0, Math.min(100, 100 - 55 * Math.pow(worst, 1.5))));
-  }
+  // Orange : proche d'une limite (>= 80%)
+  if (windSpeed >= boat.maxWind * 0.8) return 'orange';
+  if (windGust >= boat.maxWind) return 'orange';
+  if (waveHeight >= boat.maxWaves * 0.8) return 'orange';
+  if (tideHeight !== undefined && tideHeight > 0 && tideHeight < boat.draft * 1.25) return 'orange';
 
-  const worst = Math.max(windR, gustR, waveR);
-  return Math.round(Math.max(0, Math.min(100, 100 - 55 * Math.pow(worst, 1.5))));
+  return 'green';
 }
 
-export function levelFromScore(score: number): VerdictLevel {
-  if (score >= 65) return 'green';
-  if (score >= 35) return 'orange';
-  return 'red';
+// Valeur interne pour la timeline (barres visuelles uniquement, jamais affiché)
+function levelToScore(level: VerdictLevel): number {
+  if (level === 'green') return 90;
+  if (level === 'orange') return 50;
+  return 10;
 }
 
-// Rétrocompat — utilisé dans TideChartVertical
-export function assessConditions(
-  windSpeed: number,
-  windGust: number,
-  waveHeight: number
-): { wind: VerdictLevel; gust: VerdictLevel; wave: VerdictLevel; overall: VerdictLevel } {
-  const score = computeScore(windSpeed, windGust, waveHeight);
-  const overall = levelFromScore(score);
-  const wind: VerdictLevel  = windSpeed > 25 ? 'red' : windSpeed > 15 ? 'orange' : 'green';
-  const gust: VerdictLevel  = windGust  > 32 ? 'red' : windGust  > 22 ? 'orange' : 'green';
-  const wave: VerdictLevel  = waveHeight > 2.5 ? 'red' : waveHeight > 1.5 ? 'orange' : 'green';
-  return { wind, gust, wave, overall };
-}
-
-// Construit une map heure → hauteur d'eau à partir des points de marée
 function buildTideByHour(points: TidePoint[], dayPrefix: string): Record<number, number> {
   const map: Record<number, number> = {};
   for (const p of points) {
@@ -58,7 +41,6 @@ function buildTideByHour(points: TidePoint[], dayPrefix: string): Record<number,
   return map;
 }
 
-// Calcule les 24 scores horaires (un par heure 0h–23h)
 function buildHourlyScores(
   hourly: HourlyWeather[],
   dayPrefix: string,
@@ -71,15 +53,14 @@ function buildHourlyScores(
   for (const h of dayData) {
     const timePart = h.time.split('T')[1] ?? '';
     const hour = parseInt(timePart.slice(0, 2), 10);
-    const tideHeight = tideByHour[hour];
-    byHour[hour] = computeScore(h.windSpeed, h.windGust, h.waveHeight, boat, tideHeight);
+    byHour[hour] = levelToScore(assessLevel(h.windSpeed, h.windGust, h.waveHeight, boat, tideByHour[hour]));
   }
   return Array.from({ length: 24 }, (_, i) => byHour[i] ?? 50);
 }
 
 function findAllWindows(scores: number[]): { start: number; end: number }[] {
-  // Cherche d'abord les fenêtres vertes (score ≥ 65), sinon orange (≥ 35)
-  const threshold = scores.some(s => s >= 65) ? 65 : 35;
+  // Cherche les fenêtres vertes (90) puis orange+vert (>= 30)
+  const threshold = scores.some(s => s >= 80) ? 80 : 30;
   const windows: { start: number; end: number }[] = [];
   let i = 0;
   while (i < 24) {
@@ -109,23 +90,20 @@ export function calculateVerdict(
 
   const currentHour = new Date().getHours();
   const currentTideHeight = tideData?.currentHeight;
-  const score = hourlyScores[currentHour]
-    ?? computeScore(weather.windSpeed, weather.windGust, weather.waveHeight, boat, currentTideHeight);
-  const level = levelFromScore(score);
+  const level = assessLevel(weather.windSpeed, weather.windGust, weather.waveHeight, boat, currentTideHeight);
 
   const reasons: string[] = [];
   if (currentTideHeight !== undefined && currentTideHeight > 0) {
-    const draftR = boat.draft / currentTideHeight;
-    if (draftR >= 1.0)
+    if (currentTideHeight < boat.draft)
       reasons.push(`Eau insuffisante : ${currentTideHeight.toFixed(1)} m (TE ${boat.draft} m)`);
-    else if (draftR >= 0.85)
+    else if (currentTideHeight < boat.draft * 1.25)
       reasons.push(`Faible hauteur d'eau : ${currentTideHeight.toFixed(1)} m (TE ${boat.draft} m)`);
   }
-  if (weather.windSpeed > boat.maxWind * 0.8)
+  if (weather.windSpeed >= boat.maxWind * 0.8)
     reasons.push(`Vent ${Math.round(weather.windSpeed)} nœuds (seuil ${boat.maxWind} kn)`);
-  if (weather.windGust > boat.maxWind * 1.1)
+  if (weather.windGust >= boat.maxWind)
     reasons.push(`Rafales ${Math.round(weather.windGust)} nœuds`);
-  if (weather.waveHeight > boat.maxWaves * 0.8)
+  if (weather.waveHeight >= boat.maxWaves * 0.8)
     reasons.push(`Vagues ${weather.waveHeight.toFixed(1)} m (seuil ${boat.maxWaves} m)`);
   if (level === 'green' && reasons.length === 0)
     reasons.push(`Vent ${Math.round(weather.windSpeed)} kn · Vagues ${weather.waveHeight.toFixed(1)} m`);
@@ -137,11 +115,6 @@ export function calculateVerdict(
     orange: 'Sortie possible',
     red:    'Sortie déconseillée',
   };
-  const subtitles: Record<VerdictLevel, string> = {
-    green:  'Vous pouvez sortir en toute sécurité.',
-    orange: 'Conditions correctes, restez vigilant.',
-    red:    'Attendez une meilleure fenêtre.',
-  };
 
-  return { level, score, hourlyScores, title: titles[level], subtitle: subtitles[level], reasons, recommendedWindows };
+  return { level, hourlyScores, title: titles[level], reasons, recommendedWindows };
 }

@@ -7,7 +7,7 @@ import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
 import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
-import { computeScore } from '../utils/verdictCalculator';
+import { assessLevel } from '../utils/verdictCalculator';
 
 interface Props {
   port: Port;
@@ -32,7 +32,7 @@ const COND_PALETTE = {
 
 function condLevel(ratio: number): keyof typeof COND_PALETTE {
   if (ratio >= 1.0) return 'red';
-  if (ratio >= 0.75) return 'orange';
+  if (ratio >= 0.8) return 'orange';
   return 'green';
 }
 
@@ -76,11 +76,10 @@ const barStyles = StyleSheet.create({
   fill:     { height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.28)' },
 });
 
-function scoreColor(s: number) {
-  if (s >= 75) return { bg: COLORS.go,    ink: COLORS.goInk };
-  if (s >= 55) return { bg: '#d4edaa',    ink: '#3a5a1a' };
-  if (s >= 35) return { bg: COLORS.warn,  ink: '#7a3d18' };
-  return           { bg: COLORS.stop,     ink: '#fff' };
+function levelColor(level: 'green' | 'orange' | 'red') {
+  if (level === 'green')  return { bg: COLORS.go,   ink: COLORS.goInk };
+  if (level === 'orange') return { bg: COLORS.warn,  ink: '#7a3d18' };
+  return                         { bg: COLORS.stop,  ink: '#fff' };
 }
 
 function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): HourlyWeather | null {
@@ -120,7 +119,8 @@ function buildTimelineData(
     const w = weatherData.hourly.find(x => x.time.startsWith(prefix));
     const tp = tideData?.points.find(p => p.time.startsWith(prefix));
     const tideH = tp?.height ?? null;
-    scores.push(w ? computeScore(w.windSpeed, w.windGust, w.waveHeight, boat, tideH ?? undefined) : 50);
+    const lvl = w ? assessLevel(w.windSpeed, w.windGust, w.waveHeight, boat, tideH ?? undefined) : 'orange';
+    scores.push(lvl === 'green' ? 90 : lvl === 'orange' ? 50 : 10);
     tideHeights.push(tideH ?? 0);
   }
   return { scores, tideHeights };
@@ -182,18 +182,18 @@ export default function HomeScreen({
   const displayDate = new Date(displayMs);
   const displayHourInt = displayDate.getHours();
 
-  const displayScoreIdx = Math.max(0, Math.min(TOTAL_HOURS - 1, Math.round((scrubOffset ?? 0) + PAST_HOURS)));
-  const displayScore = (() => {
-    if (scrubOffset === null) return verdict?.hourlyScores[hour] ?? verdict?.score ?? 0;
-    if (isToday) return scores50h[displayScoreIdx] ?? 50;
-    const idx = Math.max(0, Math.min(23, Math.round(Math.min(hour, 22) + scrubOffset)));
-    return verdict?.hourlyScores[idx] ?? 50;
-  })();
-  const { bg, ink } = scoreColor(displayScore);
-
-  // Données météo et marée à l'heure affichée
-  const hourlyW = scrubOffset !== null && weatherData
-    ? findHourlyWeather(weatherData.hourly, displayHourInt, displayDate)
+  // Données météo et marée à l'heure affichée (calculées avant le niveau pour en dépendre)
+  const hourlyW = weatherData
+    ? (() => {
+        const w = weatherData.hourly.find(h => {
+          const y = displayDate.getFullYear();
+          const m = String(displayDate.getMonth() + 1).padStart(2, '0');
+          const d = String(displayDate.getDate()).padStart(2, '0');
+          const prefix = `${y}-${m}-${d}T${String(displayHourInt).padStart(2, '0')}`;
+          return h.time.startsWith(prefix);
+        });
+        return w ?? null;
+      })()
     : null;
   const displayWind  = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
   const displayGust  = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
@@ -203,6 +203,9 @@ export default function HomeScreen({
     if (isToday) return tideData.currentHeight;
     return findTideHeight(tideData.points, hour, selectedDate) ?? 0;
   })() : 0;
+
+  const displayLevel = assessLevel(displayWind, displayGust, displayWaveH, boat, displayTideH > 0 ? displayTideH : undefined);
+  const { bg, ink } = levelColor(displayLevel);
 
   const isScrubbing = scrubOffset !== null;
 

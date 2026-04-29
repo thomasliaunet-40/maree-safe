@@ -52,12 +52,10 @@ export type VerdictLevel = 'green' | 'orange' | 'red';
 
 export interface VerdictResult {
   level: VerdictLevel;
-  score: number;           // 0–100
-  hourlyScores: number[];  // 24 valeurs pour la timeline
+  hourlyScores: number[];  // 90/50/10 par heure — usage interne timeline uniquement
   title: string;
-  subtitle: string;
   reasons: string[];
-  recommendedWindows: { start: number; end: number }[]; // heures entières, toutes les fenêtres du jour
+  recommendedWindows: { start: number; end: number }[];
 }
 
 export interface BoatSettings {
