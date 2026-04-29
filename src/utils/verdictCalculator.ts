@@ -12,7 +12,7 @@ export function assessLevel(
   if (windSpeed >= boat.maxWind) return 'red';
   if (windGust >= boat.maxWind * 1.3) return 'red';
   if (waveHeight >= boat.maxWaves) return 'red';
-  if (tideHeight !== undefined && tideHeight > 0 && tideHeight < boat.draft) return 'red';
+  if (tideHeight !== undefined && tideHeight > 0 && tideHeight <= boat.draft) return 'red';
 
   // Orange : proche d'une limite (>= 80%)
   if (windSpeed >= boat.maxWind * 0.8) return 'orange';
