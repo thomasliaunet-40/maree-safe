@@ -5,6 +5,9 @@ on:
     - cron: '0 3 * * *'  # Tous les jours à 3h UTC (5h heure de Paris en été)
   workflow_dispatch:      # Déclenchement manuel possible depuis GitHub
 
+permissions:
+  contents: write
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
