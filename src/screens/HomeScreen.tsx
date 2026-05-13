@@ -30,20 +30,21 @@ const COND_PALETTE = {
   red:    { bg: COLORS.stop, fg: '#fff'        },
 };
 
-function condLevel(ratio: number): keyof typeof COND_PALETTE {
+function condLevel(ratio: number, warnRatio: number): keyof typeof COND_PALETTE {
   if (ratio >= 1.0) return 'red';
-  if (ratio >= 0.67) return 'orange';
+  if (ratio >= warnRatio) return 'orange';
   return 'green';
 }
 
-function ConditionBar({ icon, label, value, sub, ratio }: {
+function ConditionBar({ icon, label, value, sub, ratio, warnRatio }: {
   icon: Parameters<typeof Icon>[0]['name'];
   label: string;
   value: string;
   sub: string;
   ratio: number;
+  warnRatio: number;
 }) {
-  const { bg, fg } = COND_PALETTE[condLevel(ratio)];
+  const { bg, fg } = COND_PALETTE[condLevel(ratio, warnRatio)];
   const fill = Math.min(ratio, 1);
   return (
     <View style={[barStyles.card, { backgroundColor: bg }]}>
@@ -355,10 +356,12 @@ export default function HomeScreen({
 
             {/* Conditions vs seuils */}
             {weatherData && (() => {
+              const warnWindRatio  = (boat.warnWind  ?? boat.maxWind  * 0.8) / boat.maxWind;
+              const warnWavesRatio = (boat.warnWaves ?? boat.maxWaves * 0.8) / boat.maxWaves;
               const conditions = [
-                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH }] : []),
-                { icon: 'wind' as const, label: 'Vent',   value: `${Math.round(displayWind)} kn`, sub: `max ${boat.maxWind} kn`,  ratio: displayWind / boat.maxWind },
-                { icon: 'wave' as const, label: 'Vagues', value: `${displayWaveH.toFixed(1)} m`,  sub: `max ${boat.maxWaves} m`,  ratio: displayWaveH / boat.maxWaves },
+                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH, warnRatio: 1 / 1.5 }] : []),
+                { icon: 'wind' as const, label: 'Vent',   value: `${Math.round(displayWind)} kn`, sub: `max ${boat.maxWind} kn`,  ratio: displayWind / boat.maxWind,   warnRatio: warnWindRatio },
+                { icon: 'wave' as const, label: 'Vagues', value: `${displayWaveH.toFixed(1)} m`,  sub: `max ${boat.maxWaves} m`,  ratio: displayWaveH / boat.maxWaves, warnRatio: warnWavesRatio },
               ];
               return (
                 <TouchableOpacity style={styles.condCard} onPress={() => onNav('boat')} activeOpacity={0.97}>

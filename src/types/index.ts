@@ -63,6 +63,8 @@ export interface BoatSettings {
   draft: number;
   maxWind: number;
   maxWaves: number;
+  warnWind?: number;   // seuil orange vent (kn)
+  warnWaves?: number;  // seuil orange vagues (m)
   // champs legacy conservés pour compatibilité AsyncStorage
   type?: string;
   length?: number;
@@ -74,6 +76,8 @@ export const BOAT_DEFAULT: BoatSettings = {
   draft: 1.8,
   maxWind: 25,
   maxWaves: 1.8,
+  warnWind: 15,
+  warnWaves: 1.0,
 };
 
 export const BOAT_TYPES = [

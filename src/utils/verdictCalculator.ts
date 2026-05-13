@@ -7,8 +7,10 @@ export function assessWeatherLevel(
   waveHeight: number,
   boat: BoatSettings = BOAT_DEFAULT
 ): VerdictLevel {
+  const warnWind = boat.warnWind ?? boat.maxWind * 0.8;
+  const warnWaves = boat.warnWaves ?? boat.maxWaves * 0.8;
   if (windSpeed >= boat.maxWind || windGust >= boat.maxWind * 1.3 || waveHeight >= boat.maxWaves) return 'red';
-  if (windSpeed >= boat.maxWind * 0.8 || windGust >= boat.maxWind || waveHeight >= boat.maxWaves * 0.8) return 'orange';
+  if (windSpeed >= warnWind || windGust >= boat.maxWind || waveHeight >= warnWaves) return 'orange';
   return 'green';
 }
 

@@ -49,6 +49,8 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
       draft: formDraft,
       maxWind: BOAT_DEFAULT.maxWind,
       maxWaves: BOAT_DEFAULT.maxWaves,
+      warnWind: BOAT_DEFAULT.warnWind,
+      warnWaves: BOAT_DEFAULT.warnWaves,
     };
     onBoatsChange(next);
     setCreatingIndex(null);
@@ -241,33 +243,47 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
             ))}
           </View>
 
-          {/* Sliders — vent et vagues uniquement */}
+          {/* Sliders — vent et vagues */}
           {activeBoat && !isCreating && (
             <>
               <Text style={styles.sectionLabel}>Seuils de sécurité</Text>
-              <SliderCard
-                label="Vent maximum"
-                sublabel="Au-delà, sortie déconseillée"
-                value={activeBoat.maxWind}
-                min={10} max={45} step={1}
+              <RangeSliderCard
+                label="Vent"
                 unit="kn"
-                onChange={v => updateBoat(activeIndex, 'maxWind', v)}
-                rangeMin="10 kn" rangeMax="45 kn"
-                accentColor={COLORS.sandInk}
-                cardStyle={{ backgroundColor: COLORS.sand }}
-                valueStyle={{ color: COLORS.sandInk }}
+                warn={activeBoat.warnWind ?? BOAT_DEFAULT.warnWind!}
+                max={activeBoat.maxWind}
+                rangeMin={10} rangeMax={45} step={1}
+                onWarnChange={v => {
+                  const next = [...boats] as (BoatSettings | null)[];
+                  const b = next[activeIndex] as BoatSettings;
+                  next[activeIndex] = { ...b, warnWind: v, maxWind: Math.max(b.maxWind, v + 1) };
+                  onBoatsChange(next);
+                }}
+                onMaxChange={v => {
+                  const next = [...boats] as (BoatSettings | null)[];
+                  const b = next[activeIndex] as BoatSettings;
+                  next[activeIndex] = { ...b, maxWind: v, warnWind: Math.min(b.warnWind ?? BOAT_DEFAULT.warnWind!, v - 1) };
+                  onBoatsChange(next);
+                }}
               />
-              <SliderCard
-                label="Vagues maximum"
-                sublabel="Hauteur significative"
-                value={activeBoat.maxWaves}
-                min={0.5} max={4} step={0.1}
+              <RangeSliderCard
+                label="Vagues"
                 unit="m"
-                onChange={v => updateBoat(activeIndex, 'maxWaves', v)}
-                rangeMin="0.5 m" rangeMax="4 m"
-                accentColor={COLORS.tideInk}
-                cardStyle={{ backgroundColor: COLORS.tide }}
-                valueStyle={{ color: COLORS.tideInk }}
+                warn={activeBoat.warnWaves ?? BOAT_DEFAULT.warnWaves!}
+                max={activeBoat.maxWaves}
+                rangeMin={0.2} rangeMax={4} step={0.1}
+                onWarnChange={v => {
+                  const next = [...boats] as (BoatSettings | null)[];
+                  const b = next[activeIndex] as BoatSettings;
+                  next[activeIndex] = { ...b, warnWaves: v, maxWaves: Math.max(b.maxWaves, parseFloat((v + 0.1).toFixed(1))) };
+                  onBoatsChange(next);
+                }}
+                onMaxChange={v => {
+                  const next = [...boats] as (BoatSettings | null)[];
+                  const b = next[activeIndex] as BoatSettings;
+                  next[activeIndex] = { ...b, maxWaves: v, warnWaves: Math.min(b.warnWaves ?? BOAT_DEFAULT.warnWaves!, parseFloat((v - 0.1).toFixed(1))) };
+                  onBoatsChange(next);
+                }}
               />
               <TouchableOpacity
                 style={styles.validateBtn}
@@ -287,46 +303,86 @@ export default function BoatScreen({ boats, activeIndex, onBoatsChange, onActive
   );
 }
 
-interface SliderCardProps {
+interface RangeSliderCardProps {
   label: string;
-  sublabel?: string;
-  value: number;
-  min: number; max: number; step: number;
   unit: string;
-  onChange: (v: number) => void;
-  rangeMin: string; rangeMax: string;
-  accentColor?: string;
-  cardStyle?: object;
-  valueStyle?: object;
+  warn: number;
+  max: number;
+  rangeMin: number;
+  rangeMax: number;
+  step: number;
+  onWarnChange: (v: number) => void;
+  onMaxChange: (v: number) => void;
 }
 
-function SliderCard({ label, sublabel, value, min, max, step, unit, onChange, rangeMin, rangeMax, accentColor, cardStyle, valueStyle }: SliderCardProps) {
+function RangeSliderCard({ label, unit, warn, max, rangeMin, rangeMax, step, onWarnChange, onMaxChange }: RangeSliderCardProps) {
+  const total = rangeMax - rangeMin;
+  const fmt = (v: number) => step < 1 ? v.toFixed(1) : String(Math.round(v));
+  const greenPct = Math.max(0, ((warn - rangeMin) / total) * 100);
+  const orangePct = Math.max(0, ((max - warn) / total) * 100);
+  const redPct = Math.max(0, ((rangeMax - max) / total) * 100);
+
   return (
-    <View style={[styles.sliderCard, cardStyle]}>
+    <View style={styles.sliderCard}>
+      {/* Header */}
       <View style={styles.sliderTop}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.sliderLabel}>{label}</Text>
-          {sublabel && <Text style={styles.sliderSub}>{sublabel}</Text>}
+        <Text style={styles.sliderLabel}>{label}</Text>
+        <View style={{ alignItems: 'flex-end', gap: 2 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={[styles.thresholdDot, { backgroundColor: COLORS.warn }]} />
+            <Text style={styles.thresholdVal}>{fmt(warn)} {unit}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={[styles.thresholdDot, { backgroundColor: COLORS.stop }]} />
+            <Text style={styles.thresholdVal}>{fmt(max)} {unit}</Text>
+          </View>
         </View>
-        <Text style={[styles.sliderValue, valueStyle]}>
-          {step < 1 ? value.toFixed(1) : value}
-          <Text style={styles.sliderUnit}> {unit}</Text>
-        </Text>
+      </View>
+
+      {/* Barre colorée */}
+      <View style={styles.colorBar}>
+        <View style={[styles.colorSeg, { flex: greenPct, backgroundColor: COLORS.go }]} />
+        <View style={[styles.colorSeg, { flex: orangePct, backgroundColor: COLORS.warn }]} />
+        <View style={[styles.colorSeg, { flex: redPct, backgroundColor: COLORS.stop }]} />
+      </View>
+
+      {/* Slider vigilance (orange) */}
+      <View style={styles.thresholdRow}>
+        <View style={[styles.thresholdDot, { backgroundColor: COLORS.warn }]} />
+        <Text style={styles.thresholdRowLabel}>Orange dès <Text style={{ color: COLORS.ink, fontFamily: FONTS.semiBold }}>{fmt(warn)} {unit}</Text></Text>
       </View>
       <Slider
-        style={{ width: '100%' }}
-        minimumValue={min}
-        maximumValue={max}
+        style={{ width: '100%', marginTop: -4 }}
+        minimumValue={rangeMin}
+        maximumValue={rangeMax}
         step={step}
-        value={value}
-        onValueChange={onChange}
-        minimumTrackTintColor={accentColor ?? COLORS.brand}
-        maximumTrackTintColor="rgba(0,0,0,0.15)"
-        thumbTintColor={accentColor ?? COLORS.brand}
+        value={warn}
+        onValueChange={v => onWarnChange(Math.min(parseFloat(v.toFixed(1)), parseFloat((max - step).toFixed(1))))}
+        minimumTrackTintColor={COLORS.go}
+        maximumTrackTintColor="rgba(0,0,0,0.1)"
+        thumbTintColor={COLORS.warn}
       />
+
+      {/* Slider danger (rouge) */}
+      <View style={[styles.thresholdRow, { marginTop: 6 }]}>
+        <View style={[styles.thresholdDot, { backgroundColor: COLORS.stop }]} />
+        <Text style={styles.thresholdRowLabel}>Rouge dès <Text style={{ color: COLORS.ink, fontFamily: FONTS.semiBold }}>{fmt(max)} {unit}</Text></Text>
+      </View>
+      <Slider
+        style={{ width: '100%', marginTop: -4 }}
+        minimumValue={rangeMin}
+        maximumValue={rangeMax}
+        step={step}
+        value={max}
+        onValueChange={v => onMaxChange(Math.max(parseFloat(v.toFixed(1)), parseFloat((warn + step).toFixed(1))))}
+        minimumTrackTintColor={COLORS.warn}
+        maximumTrackTintColor="rgba(0,0,0,0.1)"
+        thumbTintColor={COLORS.stop}
+      />
+
       <View style={styles.sliderRange}>
-        <Text style={styles.sliderRangeTxt}>{rangeMin}</Text>
-        <Text style={styles.sliderRangeTxt}>{rangeMax}</Text>
+        <Text style={styles.sliderRangeTxt}>{fmt(rangeMin)} {unit}</Text>
+        <Text style={styles.sliderRangeTxt}>{fmt(rangeMax)} {unit}</Text>
       </View>
     </View>
   );
@@ -384,14 +440,17 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 11, fontFamily: FONTS.semiBold, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 0.12, marginBottom: 12 },
 
-  sliderCard:    { backgroundColor: COLORS.paper, borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: COLORS.hairline },
-  sliderTop:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 },
-  sliderLabel:   { fontSize: 13, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  sliderSub:     { fontSize: 11, fontFamily: FONTS.regular, color: COLORS.ink3, marginTop: 2 },
-  sliderValue:   { fontSize: 22, fontFamily: FONTS.display, color: COLORS.ink },
-  sliderUnit:    { fontSize: 12, opacity: 0.6 },
-  sliderRange:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  sliderRangeTxt:{ fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
+  sliderCard:      { backgroundColor: COLORS.paper, borderRadius: 20, padding: 18, marginBottom: 12, borderWidth: 1, borderColor: COLORS.hairline },
+  sliderTop:       { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
+  sliderLabel:     { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  sliderRange:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
+  sliderRangeTxt:  { fontSize: 10, fontFamily: FONTS.mono, color: COLORS.ink4 },
+  colorBar:        { flexDirection: 'row', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 14 },
+  colorSeg:        { height: 8 },
+  thresholdDot:    { width: 8, height: 8, borderRadius: 4 },
+  thresholdVal:    { fontSize: 12, fontFamily: FONTS.mono, color: COLORS.ink3 },
+  thresholdRow:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  thresholdRowLabel: { fontSize: 12, fontFamily: FONTS.regular, color: COLORS.ink3 },
 
   validateBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
