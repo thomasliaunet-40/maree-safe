@@ -120,14 +120,10 @@ function buildTimelineData(
     const dd = String(d.getDate()).padStart(2, '0');
     const hh = String(d.getHours()).padStart(2, '0');
     const prefix = `${y}-${m}-${dd}T${hh}`;
-    // Tous les points 10 min dans cette heure
     const hourPts = tideData?.points.filter(p => p.time.startsWith(prefix)) ?? [];
-    // Hauteur pour la courbe : valeur au début de l'heure (premier point)
     const curveH = hourPts[0]?.height ?? null;
-    // Hauteur pour le score : minimum de l'heure (pire cas)
-    const minH = hourPts.length > 0 ? Math.min(...hourPts.map(p => p.height)) : null;
     tideHeights.push(curveH ?? 0);
-    rawTideLevels.push(minH !== null && minH > 0 ? assessTideLevel(minH, boat.draft) : 'green');
+    rawTideLevels.push(curveH !== null && curveH > 0 ? assessTideLevel(curveH, boat.draft) : 'green');
   }
 
   const smoothedTide = smoothTideLevels(rawTideLevels);
