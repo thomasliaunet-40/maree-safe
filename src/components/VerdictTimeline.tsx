@@ -35,17 +35,18 @@ interface Props {
   startEpoch: number;      // timestamp ms de l'index 0
   cursorHourOffset: number; // heures depuis index 0 où le curseur est fixé
   onOffsetChange?: (offsetFromCursor: number) => void; // heures depuis cursorHourOffset
+  initialScrollX?: number; // position de scroll initiale (pour jours non-aujourd'hui)
 }
 
 const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
-  ({ scores, tideHeights, startEpoch, cursorHourOffset, onOffsetChange }, ref) => {
+  ({ scores, tideHeights, startEpoch, cursorHourOffset, onOffsetChange, initialScrollX }, ref) => {
     const scrollRef = useRef<ScrollView>(null);
     const totalHours = scores.length;
     const contentWidth = totalHours * PPH;
     const cursorX = cursorHourOffset * PPH;
 
     useImperativeHandle(ref, () => ({
-      scrollToNow: () => scrollRef.current?.scrollTo({ x: 0, animated: true }),
+      scrollToNow: () => scrollRef.current?.scrollTo({ x: initialScrollX ?? 0, animated: true }),
     }));
 
     const handleScroll = (scrollX: number) => {

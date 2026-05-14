@@ -199,9 +199,8 @@ export default function HomeScreen({
   const displayMs = (() => {
     if (scrubOffset === null) return now.getTime();
     if (isToday) return now.getTime() + scrubOffset * 3600000;
-    // Non-aujourd'hui : curseur positionné à Math.min(hour,22)h depuis minuit du jour sélectionné
     const base = new Date(selectedDate); base.setHours(0, 0, 0, 0);
-    return base.getTime() + (Math.min(hour, 22) + scrubOffset) * 3600000;
+    return base.getTime() + (PAST_HOURS + scrubOffset) * 3600000;
   })();
   const displayDate = new Date(displayMs);
   const displayHourInt = displayDate.getHours();
@@ -318,7 +317,8 @@ export default function HomeScreen({
                   scores={isToday ? scores50h : verdict.hourlyScores}
                   tideHeights={isToday ? tideH50 : tideH24ForDate}
                   startEpoch={isToday ? startEpoch : new Date(selectedDate).setHours(0, 0, 0, 0)}
-                  cursorHourOffset={isToday ? PAST_HOURS : Math.min(hour, 22)}
+                  cursorHourOffset={PAST_HOURS}
+                  initialScrollX={isToday ? 0 : Math.max(0, (Math.min(hour, 22) - PAST_HOURS) * 42)}
                   onOffsetChange={setScrubOffset}
                 />
               </View>
