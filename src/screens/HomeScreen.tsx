@@ -330,34 +330,6 @@ export default function HomeScreen({
                 </Text>
               )}
 
-              {/* Fenêtres optimales — uniquement celles qui ne sont pas passées */}
-              {(() => {
-                const windows = isToday
-                  ? verdict.recommendedWindows.filter(w => w.end >= hour)
-                  : verdict.recommendedWindows;
-
-                return windows.length > 0 ? (
-                <View style={styles.windowRow}>
-                  <View style={[styles.windowIcon, { backgroundColor: `${ink}CC` }]}>
-                    <Icon name="check" size={18} stroke="#fff" strokeWidth={2.5} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.windowLabel, { color: ink }]}>
-                      {windows.length > 1 ? 'FENÊTRES OPTIMALES' : 'FENÊTRE OPTIMALE'}
-                    </Text>
-                    {windows.map((w, i) => (
-                      <View key={i} style={i > 0 ? styles.windowSep : undefined}>
-                        <Text style={[styles.windowTime, { color: ink }]}>
-                          {w.start}h00 — {w.end + 1}h00
-                          <Text style={[styles.windowDur, { color: ink }]}>
-                            {' '}· {w.end - w.start + 1}h
-                          </Text>
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : null; })()}
             </View>
 
             {/* Conditions vs seuils */}
@@ -429,12 +401,6 @@ const styles = StyleSheet.create({
   verdictTime:  { fontSize: 20, fontFamily: FONTS.display, letterSpacing: -0.3, opacity: 0.85, marginBottom: 10, textAlign: 'center' },
   verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, textAlign: 'center' },
   coefLine:     { fontSize: 26, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
-  windowRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: 20, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 18, padding: 14 },
-  windowIcon:   { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  windowLabel:  { fontSize: 12, fontFamily: FONTS.semiBold, opacity: 0.7, textTransform: 'uppercase', letterSpacing: 0.1 },
-  windowTime:   { fontSize: 19, fontFamily: FONTS.semiBold },
-  windowDur:    { fontFamily: FONTS.regular, opacity: 0.65 },
-  windowSep:    { marginTop: 4 },
 
   // Conditions card
   condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 20, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
