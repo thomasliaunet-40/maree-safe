@@ -6,6 +6,7 @@ import { ALL_PORTS } from '../constants/ports';
 import { fetchTideData } from '../services/tideService';
 import { fetchWeatherData } from '../services/weatherService';
 import { saveApiKey, loadApiKey, saveSelectedPortId, loadSelectedPortId } from '../services/storageService';
+import { getLastAvailableDate } from '../services/remoteTideService';
 import { saveBoatProfiles, loadBoatProfiles, saveActiveBoatIndex, loadActiveBoatIndex } from '../services/boatService';
 import { calculateVerdict } from '../utils/verdictCalculator';
 import { Screen } from '../components/FabNav';
@@ -40,6 +41,9 @@ export default function AppNavigator() {
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [showApiKey, setShowApiKey] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [maxAvailableDate, setMaxAvailableDate] = useState<Date>(() => {
+    const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + 8); return d;
+  });
 
   const activeBoat = boats[activeBoatIndex] ?? BOAT_DEFAULT;
 
@@ -91,10 +95,34 @@ export default function AppNavigator() {
     if (initialized) loadData(port, apiKey, selectedDate, activeBoat);
   }, [initialized, port, selectedDate]);
 
+  useEffect(() => {
+    getLastAvailableDate(port.id).then(lastTide => {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const weatherMax = new Date(today); weatherMax.setDate(today.getDate() + 8);
+      setMaxAvailableDate(lastTide && lastTide < weatherMax ? lastTide : weatherMax);
+    });
+  }, [port]);
+
   // Recalcule verdict quand le bateau actif change
   useEffect(() => {
     if (weatherData) setVerdict(calculateVerdict(weatherData, activeBoat, selectedDate, tideData));
   }, [boats, activeBoatIndex]);
+
+  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+  const canGoPrev = selectedDate.getTime() > todayMidnight.getTime();
+  const canGoNext = !loading && selectedDate.getTime() < maxAvailableDate.getTime();
+
+  const handlePrevDay = () => {
+    if (!canGoPrev || loading) return;
+    const d = new Date(selectedDate); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0);
+    setSelectedDate(d);
+  };
+
+  const handleNextDay = () => {
+    if (!canGoNext || loading) return;
+    const d = new Date(selectedDate); d.setDate(d.getDate() + 1); d.setHours(0, 0, 0, 0);
+    setSelectedDate(d);
+  };
 
   const handleBoatsChange = async (next: (BoatSettings | null)[]) => {
     setBoats(next);
@@ -151,6 +179,10 @@ export default function AppNavigator() {
           boat={activeBoat}
           selectedDate={selectedDate}
           isToday={isToday}
+          canGoPrev={canGoPrev}
+          canGoNext={canGoNext}
+          onPrevDay={handlePrevDay}
+          onNextDay={handleNextDay}
           onRefresh={() => loadData(port, apiKey, selectedDate, activeBoat)}
           {...commonProps}
         />

@@ -22,6 +22,10 @@ interface Props {
   isToday: boolean;
   onNav: (s: Screen) => void;
   onRefresh: () => void;
+  canGoPrev: boolean;
+  canGoNext: boolean;
+  onPrevDay: () => void;
+  onNextDay: () => void;
 }
 
 const COND_PALETTE = {
@@ -152,6 +156,7 @@ const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
   boat, selectedDate, isToday, onNav, onRefresh,
+  canGoPrev, canGoNext, onPrevDay, onNextDay,
 }: Props) {
   const nowRef = useRef(new Date());
   const now = nowRef.current;
@@ -266,7 +271,15 @@ export default function HomeScreen({
       >
         {/* Greeting */}
         <View style={styles.greeting}>
-          <Text style={styles.greetingDate}>{dateLabel}</Text>
+          <View style={styles.dateNavRow}>
+            <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
+              <Icon name="chevronLeft" size={16} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
+            </TouchableOpacity>
+            <Text style={styles.greetingDate}>{dateLabel}</Text>
+            <TouchableOpacity onPress={onNextDay} disabled={!canGoNext} activeOpacity={0.6} style={styles.dateNavBtn}>
+              <Icon name="chevronRight" size={16} stroke={canGoNext ? COLORS.ink3 : COLORS.hairline} />
+            </TouchableOpacity>
+          </View>
           <Text style={styles.greetingTitle}>
             {'Bonjour Marin,\n'}
             <Text style={styles.greetingMuted}></Text>
@@ -438,5 +451,7 @@ const styles = StyleSheet.create({
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
   planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
+  dateNavRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  dateNavBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });

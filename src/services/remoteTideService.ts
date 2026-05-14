@@ -46,6 +46,17 @@ async function fetchFromServer(portId: string): Promise<PortCache> {
   }
 }
 
+export async function getLastAvailableDate(portId: string): Promise<Date | null> {
+  let entry = await loadFromStorage(portId);
+  if (!entry) {
+    try { entry = await fetchFromServer(portId); } catch { return null; }
+  }
+  if (!entry.points.length) return null;
+  const d = new Date(entry.points[entry.points.length - 1].time);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 export async function getPointsForDate(portId: string, date: Date): Promise<TidePoint[] | null> {
   // 1. Cache AsyncStorage (< 24h)
   let entry = await loadFromStorage(portId);
