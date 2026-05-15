@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
   screen:         { flex: 1, backgroundColor: COLORS.bg },
   topBar:         { paddingTop: 14, paddingBottom: 6 },
   topBarLogoRow:  { alignItems: 'center', paddingBottom: 16 },
-  topBarNavRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22 },
+  topBarNavRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 22, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
   portBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
   portName:       { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
   dateTopRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
