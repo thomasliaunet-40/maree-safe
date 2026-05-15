@@ -7,6 +7,7 @@ import Icon from '../components/Icon';
 import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
 import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
+import AppLogo from '../components/AppLogo';
 import { assessLevel, assessWeatherLevel, assessTideLevel, worstLevel, smoothTideLevels } from '../utils/verdictCalculator';
 
 interface Props {
@@ -250,6 +251,9 @@ export default function HomeScreen({
     <View style={styles.screen}>
       {/* Top bar */}
       <View style={styles.topBar}>
+        <View style={styles.topBarLogoCenter} pointerEvents="none">
+          <AppLogo height={22} />
+        </View>
         <View style={styles.dateTopRow}>
           <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
             <Icon name="chevronLeft" size={14} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
@@ -414,6 +418,7 @@ const styles = StyleSheet.create({
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
   planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
+  topBarLogoCenter: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   dateNavBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });
