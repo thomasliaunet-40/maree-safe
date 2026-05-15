@@ -367,18 +367,7 @@ export default function HomeScreen({
             })()}
 
             {/* Action cards */}
-            <TouchableOpacity style={styles.planCard} onPress={() => onNav('week')} activeOpacity={0.85}>
-              <View style={styles.planIcon}>
-                <Icon name="calendar" size={20} stroke="#fff" strokeWidth={2} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.planTitle}>Planifier ma semaine</Text>
-                <Text style={styles.planSub}>Vue 7 jours · fenêtres détectées</Text>
-              </View>
-              <Icon name="chevronRight" size={18} stroke="rgba(255,255,255,0.5)" />
-            </TouchableOpacity>
-
-            {/* Erreurs */}
+{/* Erreurs */}
             {tideError && <Text style={styles.error}>{tideError}</Text>}
             {weatherError && <Text style={styles.error}>{weatherError}</Text>}
           </>
@@ -421,10 +410,6 @@ const styles = StyleSheet.create({
   condRows:   { gap: 8 },
 
   // Action cards
-  planCard: { backgroundColor: '#f4c98d', borderRadius: 28, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 10 },
-  planIcon: { width: 44, height: 44, borderRadius: 14, backgroundColor: '#6c9ca0', alignItems: 'center', justifyContent: 'center' },
-  planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
-  planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });

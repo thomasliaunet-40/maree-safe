@@ -13,7 +13,6 @@ import { Screen } from '../components/FabNav';
 
 import HomeScreen from '../screens/HomeScreen';
 import PortsScreen from '../screens/PortsScreen';
-import WeekScreen from '../screens/WeekScreen';
 import TideScreen from '../screens/TideScreen';
 import BoatScreen from '../screens/BoatScreen';
 import ApiKeyModal from '../components/ApiKeyModal';
@@ -176,17 +175,7 @@ export default function AppNavigator() {
           {...commonProps}
         />
       )}
-      {screen === 'week' && (
-        <WeekScreen
-          weatherData={weatherData}
-          tideData={tideData}
-          boat={activeBoat}
-          today={new Date()}
-          onSelectDate={handleSelectDate}
-          {...commonProps}
-        />
-      )}
-      {screen === 'tide' && (
+{screen === 'tide' && (
         <TideScreen
           tideData={tideData}
           selectedDate={selectedDate}
