@@ -285,14 +285,6 @@ export default function HomeScreen({
           <RefreshControl refreshing={loading} onRefresh={onRefresh} tintColor={COLORS.brand} />
         }
       >
-        {/* Greeting */}
-        <View style={styles.greeting}>
-          <Text style={styles.greetingTitle}>
-            {'Bonjour Marin,\n'}
-            <Text style={styles.greetingMuted}></Text>
-          </Text>
-        </View>
-
         {loading && !verdict ? (
           <View style={styles.loading}>
             <ActivityIndicator color={COLORS.brand} />
@@ -392,10 +384,10 @@ export default function HomeScreen({
 const styles = StyleSheet.create({
   screen:         { flex: 1, backgroundColor: COLORS.bg },
   topBar:         { paddingTop: 14, paddingBottom: 6 },
-  topBarLogoRow:  { alignItems: 'center', paddingBottom: 6 },
+  topBarLogoRow:  { alignItems: 'center', paddingBottom: 16 },
   topBarNavRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22 },
   portBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  portName:       { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  portName:       { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
   dateTopRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
 
   scroll:        { flex: 1 },
