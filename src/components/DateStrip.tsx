@@ -54,7 +54,7 @@ export default function DateStrip({ selectedDate, maxDate, verdicts, onSelect }:
             style={[styles.chip, { backgroundColor: bg }, isSelected && styles.chipSel]}
           >
             <Text style={[styles.dayName, { color: ink }]}>
-              {i === 0 ? 'Auj.' : DAY_ABBR[day.getDay()]}
+              {DAY_ABBR[day.getDay()]}
             </Text>
             <Text style={[styles.dayNum, { color: ink }]}>{day.getDate()}</Text>
           </TouchableOpacity>
@@ -67,7 +67,7 @@ export default function DateStrip({ selectedDate, maxDate, verdicts, onSelect }:
 const styles = StyleSheet.create({
   strip:   { paddingHorizontal: 22, paddingBottom: 10, gap: 6 },
   chip:    { width: 46, alignItems: 'center', paddingVertical: 8, borderRadius: 12 },
-  chipSel: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 3, transform: [{ scale: 1.06 }] },
+  chipSel: { borderWidth: 2.5, borderColor: COLORS.ink },
   dayName: { fontSize: 10, fontFamily: FONTS.semiBold, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.75 },
   dayNum:  { fontSize: 17, fontFamily: FONTS.display, marginTop: 2 },
 });
