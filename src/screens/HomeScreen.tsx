@@ -151,7 +151,7 @@ function buildTimelineData(
 }
 
 const PAST_HOURS = 2;
-const FUTURE_HOURS = 48;
+const FUTURE_HOURS = 9 * 24;
 const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
 
 export default function HomeScreen({
