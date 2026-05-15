@@ -247,27 +247,34 @@ export default function HomeScreen({
   });
   const dateLabel = dateFmt.charAt(0).toUpperCase() + dateFmt.slice(1);
 
+  const displayDateLabel = (() => {
+    const fmt = displayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return fmt.charAt(0).toUpperCase() + fmt.slice(1);
+  })();
+
   return (
     <View style={styles.screen}>
       {/* Top bar */}
       <View style={styles.topBar}>
-        <View style={styles.topBarLogoCenter} pointerEvents="none">
-          <AppLogo height={22} />
+        <View style={styles.topBarLogoRow}>
+          <AppLogo height={55} />
         </View>
-        <View style={styles.dateTopRow}>
-          <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
-            <Icon name="chevronLeft" size={14} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
-          </TouchableOpacity>
-          <Text style={styles.portName}>{dateLabel}</Text>
-          <TouchableOpacity onPress={onNextDay} disabled={!canGoNext} activeOpacity={0.6} style={styles.dateNavBtn}>
-            <Icon name="chevronRight" size={14} stroke={canGoNext ? COLORS.ink3 : COLORS.hairline} />
+        <View style={styles.topBarNavRow}>
+          <View style={styles.dateTopRow}>
+            <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
+              <Icon name="chevronLeft" size={14} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
+            </TouchableOpacity>
+            <Text style={styles.portName}>{isScrubbing ? displayDateLabel : dateLabel}</Text>
+            <TouchableOpacity onPress={onNextDay} disabled={!canGoNext} activeOpacity={0.6} style={styles.dateNavBtn}>
+              <Icon name="chevronRight" size={14} stroke={canGoNext ? COLORS.ink3 : COLORS.hairline} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.portBtn} onPress={() => onNav('ports')} activeOpacity={0.7}>
+            <Icon name="location" size={16} stroke={COLORS.ink2} />
+            <Text style={styles.portName}>{port.name}</Text>
+            <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.portBtn} onPress={() => onNav('ports')} activeOpacity={0.7}>
-          <Icon name="location" size={16} stroke={COLORS.ink2} />
-          <Text style={styles.portName}>{port.name}</Text>
-          <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -383,11 +390,13 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  screen:   { flex: 1, backgroundColor: COLORS.bg },
-  topBar:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22, paddingTop: 14, paddingBottom: 6 },
-  portBtn:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  portName: { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  dateTopRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  screen:         { flex: 1, backgroundColor: COLORS.bg },
+  topBar:         { paddingTop: 14, paddingBottom: 6 },
+  topBarLogoRow:  { alignItems: 'center', paddingBottom: 6 },
+  topBarNavRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22 },
+  portBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  portName:       { fontSize: 14, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  dateTopRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
 
   scroll:        { flex: 1 },
   scrollContent: { padding: 18, paddingBottom: 120 },
@@ -418,7 +427,6 @@ const styles = StyleSheet.create({
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
   planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
-  topBarLogoCenter: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   dateNavBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });
