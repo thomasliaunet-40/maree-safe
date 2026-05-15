@@ -108,22 +108,6 @@ export default function AppNavigator() {
     if (weatherData) setVerdict(calculateVerdict(weatherData, activeBoat, selectedDate, tideData));
   }, [boats, activeBoatIndex]);
 
-  const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
-  const canGoPrev = selectedDate.getTime() > todayMidnight.getTime();
-  const canGoNext = !loading && selectedDate.getTime() < maxAvailableDate.getTime();
-
-  const handlePrevDay = () => {
-    if (!canGoPrev || loading) return;
-    const d = new Date(selectedDate); d.setDate(d.getDate() - 1); d.setHours(0, 0, 0, 0);
-    setSelectedDate(d);
-  };
-
-  const handleNextDay = () => {
-    if (!canGoNext || loading) return;
-    const d = new Date(selectedDate); d.setDate(d.getDate() + 1); d.setHours(0, 0, 0, 0);
-    setSelectedDate(d);
-  };
-
   const handleBoatsChange = async (next: (BoatSettings | null)[]) => {
     setBoats(next);
     await saveBoatProfiles(next);
@@ -178,11 +162,9 @@ export default function AppNavigator() {
           weatherError={weatherError}
           boat={activeBoat}
           selectedDate={selectedDate}
+          maxDate={maxAvailableDate}
           isToday={isToday}
-          canGoPrev={canGoPrev}
-          canGoNext={canGoNext}
-          onPrevDay={handlePrevDay}
-          onNextDay={handleNextDay}
+          onSelectDate={handleSelectDate}
           onRefresh={() => loadData(port, apiKey, selectedDate, activeBoat)}
           {...commonProps}
         />

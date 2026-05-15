@@ -1,128 +1,73 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { ScrollView, TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { FONTS } from '../constants/fonts';
+import { VerdictLevel } from '../types';
 
 interface Props {
   selectedDate: Date;
+  maxDate: Date;
+  verdicts: Record<string, VerdictLevel>;
   onSelect: (date: Date) => void;
 }
 
 function isSameDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
+
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 const DAY_ABBR = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
-export default function DateStrip({ selectedDate, onSelect }: Props) {
-  const scrollRef = useRef<ScrollView>(null);
+function chipColors(level: VerdictLevel | undefined): { bg: string; ink: string } {
+  if (level === 'orange') return { bg: COLORS.warn,  ink: '#7a3d18' };
+  if (level === 'red')    return { bg: COLORS.stop,  ink: '#fff' };
+  if (level === 'green')  return { bg: COLORS.go,    ink: COLORS.goInk };
+  return { bg: COLORS.paperSoft, ink: COLORS.ink3 };
+}
 
-  // Générer les 9 jours (J → J+8)
+export default function DateStrip({ selectedDate, maxDate, verdicts, onSelect }: Props) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
   const days = Array.from({ length: 9 }, (_, i) => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-
-  // Scroller automatiquement vers la date sélectionnée
-  useEffect(() => {
-    const idx = days.findIndex(d => isSameDay(d, selectedDate));
-    if (idx >= 0 && scrollRef.current) {
-      scrollRef.current.scrollTo({ x: idx * CHIP_WIDTH, animated: true });
-    }
-  }, [selectedDate]);
+    const d = new Date(today); d.setDate(today.getDate() + i); return d;
+  }).filter(d => d <= maxDate);
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.strip}
-      >
-        {days.map((day, i) => {
-          const isSelected = isSameDay(day, selectedDate);
-          const isToday = i === 0;
-
-          return (
-            <TouchableOpacity
-              key={i}
-              onPress={() => onSelect(day)}
-              activeOpacity={0.7}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-            >
-              <Text style={[styles.chipDay, isSelected && styles.chipTextSelected]}>
-                {isToday ? 'Auj.' : DAY_ABBR[day.getDay()]}
-              </Text>
-              <Text style={[styles.chipNum, isSelected && styles.chipTextSelected]}>
-                {day.getDate()}
-              </Text>
-              {isToday && !isSelected && <View style={styles.todayDot} />}
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.strip}
+    >
+      {days.map((day, i) => {
+        const isSelected = isSameDay(day, selectedDate);
+        const { bg, ink } = chipColors(verdicts[dateKey(day)]);
+        return (
+          <TouchableOpacity
+            key={i}
+            onPress={() => onSelect(day)}
+            activeOpacity={0.75}
+            style={[styles.chip, { backgroundColor: bg }, isSelected && styles.chipSel]}
+          >
+            <Text style={[styles.dayName, { color: ink }]}>
+              {i === 0 ? 'Auj.' : DAY_ABBR[day.getDay()]}
+            </Text>
+            <Text style={[styles.dayNum, { color: ink }]}>{day.getDate()}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
   );
 }
 
-const CHIP_WIDTH = 56;
-
 const styles = StyleSheet.create({
-  wrapper: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.background,
-  },
-  strip: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  chip: {
-    width: CHIP_WIDTH,
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    gap: 2,
-  },
-  chipSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  chipDisabled: {
-    opacity: 0.35,
-  },
-  chipDay: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  chipNum: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  chipTextSelected: {
-    color: '#fff',
-  },
-  chipTextDisabled: {
-    color: COLORS.textMuted,
-  },
-  todayDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: COLORS.primary,
-    marginTop: 2,
-  },
+  strip:   { paddingHorizontal: 22, paddingBottom: 10, gap: 6 },
+  chip:    { width: 46, alignItems: 'center', paddingVertical: 8, borderRadius: 12 },
+  chipSel: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.18, shadowRadius: 4, elevation: 3, transform: [{ scale: 1.06 }] },
+  dayName: { fontSize: 10, fontFamily: FONTS.semiBold, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.75 },
+  dayNum:  { fontSize: 17, fontFamily: FONTS.display, marginTop: 2 },
 });

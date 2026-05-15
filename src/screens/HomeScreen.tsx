@@ -8,6 +8,7 @@ import NavFade from '../components/NavFade';
 import { Screen } from '../components/FabNav';
 import VerdictTimeline, { VerdictTimelineHandle } from '../components/VerdictTimeline';
 import AppLogo from '../components/AppLogo';
+import DateStrip from '../components/DateStrip';
 import { assessLevel, assessWeatherLevel, assessTideLevel, worstLevel, smoothTideLevels } from '../utils/verdictCalculator';
 
 interface Props {
@@ -20,13 +21,11 @@ interface Props {
   weatherError: string | null;
   boat: BoatSettings;
   selectedDate: Date;
+  maxDate: Date;
   isToday: boolean;
   onNav: (s: Screen) => void;
   onRefresh: () => void;
-  canGoPrev: boolean;
-  canGoNext: boolean;
-  onPrevDay: () => void;
-  onNextDay: () => void;
+  onSelectDate: (date: Date) => void;
 }
 
 const COND_PALETTE = {
@@ -156,8 +155,7 @@ const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
 
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
-  boat, selectedDate, isToday, onNav, onRefresh,
-  canGoPrev, canGoNext, onPrevDay, onNextDay,
+  boat, selectedDate, maxDate, isToday, onNav, onRefresh, onSelectDate,
 }: Props) {
   const nowRef = useRef(new Date());
   const now = nowRef.current;
@@ -242,6 +240,22 @@ export default function HomeScreen({
     }) ?? tideData.peaks[0] ?? null;
   })();
 
+  // Verdict dominant par jour pour les chips
+  const dayVerdicts = useMemo(() => {
+    if (!weatherData) return {};
+    const result: Record<string, VerdictLevel> = {};
+    for (let i = 0; i < 9; i++) {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const hours = weatherData.hourly.filter(h => h.time.startsWith(key));
+      if (!hours.length) continue;
+      let level: VerdictLevel = 'green';
+      for (const h of hours) level = worstLevel(level, assessWeatherLevel(h.windSpeed, h.windGust, h.waveHeight, boat));
+      result[key] = level;
+    }
+    return result;
+  }, [weatherData, boat]);
+
   const dateFmt = selectedDate.toLocaleDateString('fr-FR', {
     weekday: 'long', day: 'numeric', month: 'long',
   });
@@ -259,22 +273,17 @@ export default function HomeScreen({
         <View style={styles.topBarLogoRow}>
           <AppLogo height={55} />
         </View>
-        <View style={styles.topBarNavRow}>
-          <View style={styles.topBarDateCard}>
-            <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
-              <Icon name="chevronLeft" size={14} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
-            </TouchableOpacity>
-            <Text style={styles.portName} numberOfLines={1}>{isScrubbing ? displayDateLabel : dateLabel}</Text>
-            <TouchableOpacity onPress={onNextDay} disabled={!canGoNext} activeOpacity={0.6} style={styles.dateNavBtn}>
-              <Icon name="chevronRight" size={14} stroke={canGoNext ? COLORS.ink3 : COLORS.hairline} />
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity style={styles.topBarPortCard} onPress={() => onNav('ports')} activeOpacity={0.7}>
-            <Icon name="location" size={16} stroke={COLORS.ink2} />
-            <Text style={styles.portName} numberOfLines={1}>{port.name}</Text>
-            <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.portCard} onPress={() => onNav('ports')} activeOpacity={0.7}>
+          <Icon name="location" size={16} stroke={COLORS.ink2} />
+          <Text style={styles.portName} numberOfLines={1}>{port.name}</Text>
+          <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
+        </TouchableOpacity>
+        <DateStrip
+          selectedDate={selectedDate}
+          maxDate={maxDate}
+          verdicts={dayVerdicts}
+          onSelect={onSelectDate}
+        />
       </View>
 
       <ScrollView
@@ -382,15 +391,11 @@ export default function HomeScreen({
 }
 
 const styles = StyleSheet.create({
-  screen:         { flex: 1, backgroundColor: COLORS.bg },
-  topBar:         { paddingTop: 14, paddingBottom: 6 },
-  topBarLogoRow:  { alignItems: 'center', paddingBottom: 16 },
-  topBarNavRow:     { flexDirection: 'row', marginHorizontal: 22, gap: 8 },
-  topBarDateCard:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
-  topBarPortCard:   { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
-  portBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  portName:         { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  dateTopRow:       { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  screen:        { flex: 1, backgroundColor: COLORS.bg },
+  topBar:        { paddingTop: 14 },
+  topBarLogoRow: { alignItems: 'center', paddingBottom: 12 },
+  portCard:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginHorizontal: 22, marginBottom: 10, paddingHorizontal: 16, paddingVertical: 11, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
+  portName:      { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
 
   scroll:        { flex: 1 },
   scrollContent: { padding: 18, paddingBottom: 120 },
@@ -421,6 +426,5 @@ const styles = StyleSheet.create({
   planTitle:{ fontSize: 15, fontFamily: FONTS.semiBold, color: '#fff' },
   planSub:  { fontSize: 12, fontFamily: FONTS.regular, color: 'rgba(255,255,255,0.7)' },
 
-  dateNavBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });
