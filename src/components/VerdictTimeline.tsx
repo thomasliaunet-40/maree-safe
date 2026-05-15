@@ -41,15 +41,20 @@ interface Props {
 const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
   ({ scores, tideHeights, startEpoch, cursorHourOffset, onOffsetChange, initialScrollX }, ref) => {
     const scrollRef = useRef<ScrollView>(null);
+    const isDragging = useRef(false);
     const totalHours = scores.length;
     const contentWidth = totalHours * PPH;
     const cursorX = cursorHourOffset * PPH;
 
     useImperativeHandle(ref, () => ({
-      scrollToNow: () => scrollRef.current?.scrollTo({ x: initialScrollX ?? 0, animated: true }),
+      scrollToNow: () => {
+        isDragging.current = false;
+        scrollRef.current?.scrollTo({ x: initialScrollX ?? 0, animated: true });
+      },
     }));
 
     const handleScroll = (scrollX: number) => {
+      if (!isDragging.current) return;
       const contentX = scrollX + cursorX;
       const offsetFromCursor = contentX / PPH - cursorHourOffset;
       const snapped = Math.round(offsetFromCursor * 2) / 2;
@@ -88,6 +93,9 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
           showsHorizontalScrollIndicator={false}
           onScroll={e => handleScroll(e.nativeEvent.contentOffset.x)}
           scrollEventThrottle={16}
+          onScrollBeginDrag={() => { isDragging.current = true; }}
+          onScrollEndDrag={() => { isDragging.current = false; }}
+          onMomentumScrollEnd={() => { isDragging.current = false; }}
           contentContainerStyle={{ width: contentWidth }}
         >
           {/* Contenu scrollable : barres + marée + repères */}
