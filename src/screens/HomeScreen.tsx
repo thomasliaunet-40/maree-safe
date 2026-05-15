@@ -313,7 +313,7 @@ export default function HomeScreen({
                     const timeStr = `${String(displayHourInt).padStart(2, '0')}h${mins}`;
                     const sameDay = displayDate.getDate() === now.getDate() && displayDate.getMonth() === now.getMonth();
                     const prefix = sameDay ? '→' : displayDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
-                    return `${prefix} ${timeStr}`;
+                    return sameDay ? `${prefix} ${timeStr}` : `${prefix} - ${timeStr}`;
                   })() : isToday
                     ? `Maintenant · ${String(hour).padStart(2, '0')}h00`
                     : dateLabel}
