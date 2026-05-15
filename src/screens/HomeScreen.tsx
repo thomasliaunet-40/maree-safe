@@ -260,18 +260,18 @@ export default function HomeScreen({
           <AppLogo height={55} />
         </View>
         <View style={styles.topBarNavRow}>
-          <View style={styles.dateTopRow}>
+          <View style={styles.topBarDateCard}>
             <TouchableOpacity onPress={onPrevDay} disabled={!canGoPrev} activeOpacity={0.6} style={styles.dateNavBtn}>
               <Icon name="chevronLeft" size={14} stroke={canGoPrev ? COLORS.ink3 : COLORS.hairline} />
             </TouchableOpacity>
-            <Text style={styles.portName}>{isScrubbing ? displayDateLabel : dateLabel}</Text>
+            <Text style={styles.portName} numberOfLines={1}>{isScrubbing ? displayDateLabel : dateLabel}</Text>
             <TouchableOpacity onPress={onNextDay} disabled={!canGoNext} activeOpacity={0.6} style={styles.dateNavBtn}>
               <Icon name="chevronRight" size={14} stroke={canGoNext ? COLORS.ink3 : COLORS.hairline} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.portBtn} onPress={() => onNav('ports')} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.topBarPortCard} onPress={() => onNav('ports')} activeOpacity={0.7}>
             <Icon name="location" size={16} stroke={COLORS.ink2} />
-            <Text style={styles.portName}>{port.name}</Text>
+            <Text style={styles.portName} numberOfLines={1}>{port.name}</Text>
             <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
           </TouchableOpacity>
         </View>
@@ -385,10 +385,12 @@ const styles = StyleSheet.create({
   screen:         { flex: 1, backgroundColor: COLORS.bg },
   topBar:         { paddingTop: 14, paddingBottom: 6 },
   topBarLogoRow:  { alignItems: 'center', paddingBottom: 16 },
-  topBarNavRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: 22, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
-  portBtn:        { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  portName:       { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
-  dateTopRow:     { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  topBarNavRow:     { flexDirection: 'row', marginHorizontal: 22, gap: 8 },
+  topBarDateCard:   { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 10, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
+  topBarPortCard:   { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: COLORS.paperSoft, borderRadius: 16, borderWidth: 1, borderColor: COLORS.hairline },
+  portBtn:          { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  portName:         { fontSize: 17, fontFamily: FONTS.semiBold, color: COLORS.ink },
+  dateTopRow:       { flexDirection: 'row', alignItems: 'center', gap: 2 },
 
   scroll:        { flex: 1 },
   scrollContent: { padding: 18, paddingBottom: 120 },
