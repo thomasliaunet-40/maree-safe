@@ -350,7 +350,7 @@ export default function HomeScreen({
               const warnWindRatio  = (boat.warnWind  ?? boat.maxWind  * 0.8) / boat.maxWind;
               const warnWavesRatio = (boat.warnWaves ?? boat.maxWaves * 0.8) / boat.maxWaves;
               const conditions = [
-                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH, warnRatio: 1 / 1.5 }] : []),
+                ...(displayTideH > 0 ? [{ icon: 'anchor' as const, label: "Hauteur d'eau", value: `${displayTideH.toFixed(1)} m`, sub: `TE ${boat.draft} m`, ratio: boat.draft / displayTideH, warnRatio: 1.0 }] : []),
                 { icon: 'wind' as const, label: 'Vent',   value: `${Math.round(displayWind)} kn`, sub: `max ${boat.maxWind} kn`,  ratio: displayWind / boat.maxWind,   warnRatio: warnWindRatio },
                 { icon: 'wave' as const, label: 'Vagues', value: `${displayWaveH.toFixed(1)} m`,  sub: `max ${boat.maxWaves} m`,  ratio: displayWaveH / boat.maxWaves, warnRatio: warnWavesRatio },
               ];

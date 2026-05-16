@@ -17,7 +17,6 @@ export function assessWeatherLevel(
 // Niveau hauteur d'eau uniquement
 export function assessTideLevel(tideHeight: number, draft: number): VerdictLevel {
   if (tideHeight <= draft) return 'red';
-  if (tideHeight < draft * 1.5) return 'orange';
   return 'green';
 }
 
