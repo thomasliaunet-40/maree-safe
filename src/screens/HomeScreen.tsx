@@ -312,8 +312,8 @@ export default function HomeScreen({
                     const mins = displayDate.getMinutes() >= 30 ? '30' : '00';
                     const timeStr = `${String(displayHourInt).padStart(2, '0')}h${mins}`;
                     const sameDay = displayDate.getDate() === now.getDate() && displayDate.getMonth() === now.getMonth();
-                    const prefix = sameDay ? '→' : displayDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
-                    return sameDay ? `${prefix} ${timeStr}` : `${prefix} - ${timeStr}`;
+                    const prefix = sameDay ? 'Auj.' : displayDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+                    return `${prefix} - ${timeStr}`;
                   })() : isToday
                     ? `Maintenant · ${String(hour).padStart(2, '0')}h00`
                     : dateLabel}
