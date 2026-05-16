@@ -279,7 +279,7 @@ export default function HomeScreen({
           <Icon name="chevronDown" size={14} stroke={COLORS.ink3} />
         </TouchableOpacity>
         <DateStrip
-          selectedDate={selectedDate}
+          selectedDate={isScrubbing ? displayDate : selectedDate}
           maxDate={maxDate}
           verdicts={dayVerdicts}
           onSelect={onSelectDate}
