@@ -1,4 +1,4 @@
-import React, { useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, forwardRef, useImperativeHandle, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import Svg, { Rect, Path, Line } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
@@ -46,7 +46,12 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
     const totalHours = scores.length;
     const contentWidth = totalHours * PPH;
     const cursorX = CURSOR_H_OFFSET * PPH;
-    const initialScrollX = Math.max(0, (nowIndex - CURSOR_H_OFFSET) * PPH);
+
+    useEffect(() => {
+      const x = Math.max(0, (nowIndex - CURSOR_H_OFFSET) * PPH);
+      const t = setTimeout(() => scrollRef.current?.scrollTo({ x, animated: false }), 0);
+      return () => clearTimeout(t);
+    }, []); // scroll initial vers l'heure actuelle
 
     useImperativeHandle(ref, () => ({
       scrollToDay: (date: Date) => {
@@ -109,7 +114,6 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
           ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentOffset={{ x: initialScrollX, y: 0 }}
           onScroll={e => handleScroll(e.nativeEvent.contentOffset.x)}
           scrollEventThrottle={16}
           onScrollEndDrag={e => {
