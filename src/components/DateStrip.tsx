@@ -42,6 +42,7 @@ export default function DateStrip({ selectedDate, maxDate, verdicts, onSelect }:
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.strip}
+      style={styles.outer}
     >
       {days.map((day, i) => {
         const isSelected = isSameDay(day, selectedDate);
@@ -65,7 +66,8 @@ export default function DateStrip({ selectedDate, maxDate, verdicts, onSelect }:
 }
 
 const styles = StyleSheet.create({
-  strip:   { paddingHorizontal: 22, paddingBottom: 10, gap: 6 },
+  outer:   { flexShrink: 0 },
+  strip:   { paddingHorizontal: 22, paddingBottom: 10, gap: 6, alignItems: 'flex-start' },
   chip:    { width: 46, alignItems: 'center', paddingVertical: 8, borderRadius: 12 },
   chipSel: { borderWidth: 2.5, borderColor: COLORS.ink },
   dayName: { fontSize: 10, fontFamily: FONTS.semiBold, textTransform: 'uppercase', letterSpacing: 0.4, opacity: 0.75 },
