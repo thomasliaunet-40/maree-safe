@@ -87,7 +87,7 @@ export default function WindScreen({ weatherData, selectedDate, port, boat, onNa
     return `${DAY_ABBR[d.getDay()]}. ${d.getDate()}`;
   }, [selectedDate]);
 
-  const todayStr = selectedDate.toISOString().slice(0, 10);
+  const todayStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
 
   const todayHourly = useMemo(() => {
     if (!weatherData) return [];
@@ -140,7 +140,9 @@ export default function WindScreen({ weatherData, selectedDate, port, boat, onNa
   const yFor = (kn: number) => CHART_H - kn * yScale;
 
   const currentHour = new Date().getHours();
-  const isToday = todayStr === new Date().toISOString().slice(0, 10);
+  const now = new Date();
+  const nowStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const isToday = todayStr === nowStr;
 
   const chartWidth = PAD_L + todayHourly.length * (BAR_W + BAR_GAP) + 20;
 
