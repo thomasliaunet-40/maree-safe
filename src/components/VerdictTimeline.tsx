@@ -7,6 +7,7 @@ import { COLORS } from '../constants/colors';
 const PPH = 42; // pixels per hour
 const SVG_H = 84;
 const TICK_H = 22;
+const CURSOR_H_OFFSET = 2; // cursor at 2*PPH px from left of view
 
 function lerpColor(a: string, b: string, t: number): string {
   const ah = parseInt(a.slice(1), 16);
@@ -20,48 +21,59 @@ function lerpColor(a: string, b: string, t: number): string {
 }
 
 function scoreToColor(s: number): string {
-  // Interpolation continue : 10=rouge, 50=orange, 90=vert
   if (s >= 50) return lerpColor('#f3b96b', '#8fc8a3', Math.min(1, (s - 50) / 40));
   return lerpColor('#e88a82', '#f3b96b', Math.max(0, (s - 10) / 40));
 }
 
 export interface VerdictTimelineHandle {
-  scrollToNow: () => void;
+  scrollToDay: (date: Date) => void;
 }
 
 interface Props {
-  scores: number[];        // N valeurs, une par heure
-  tideHeights?: number[];  // N valeurs, hauteur marée
-  startEpoch: number;      // timestamp ms de l'index 0
-  cursorHourOffset: number; // heures depuis index 0 où le curseur est fixé
-  onOffsetChange?: (offsetFromCursor: number) => void; // heures depuis cursorHourOffset
-  initialScrollX?: number; // position de scroll initiale (pour jours non-aujourd'hui)
+  scores: number[];
+  tideHeights?: number[];
+  startEpoch: number;   // epoch ms of index 0 (midnight of first day)
+  nowIndex: number;     // index of current hour in the array
+  onScrollHour?: (hourIndex: number | null) => void;
+  onDayChange?: (date: Date) => void;
 }
 
 const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
-  ({ scores, tideHeights, startEpoch, cursorHourOffset, onOffsetChange, initialScrollX }, ref) => {
+  ({ scores, tideHeights, startEpoch, nowIndex, onScrollHour, onDayChange }, ref) => {
     const scrollRef = useRef<ScrollView>(null);
     const ignoreScrollUntil = useRef(0);
+    const scrollEndTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const totalHours = scores.length;
     const contentWidth = totalHours * PPH;
-    const cursorX = cursorHourOffset * PPH;
+    const cursorX = CURSOR_H_OFFSET * PPH;
+    const initialScrollX = Math.max(0, (nowIndex - CURSOR_H_OFFSET) * PPH);
 
     useImperativeHandle(ref, () => ({
-      scrollToNow: () => {
-        ignoreScrollUntil.current = Date.now() + 300;
-        scrollRef.current?.scrollTo({ x: initialScrollX ?? 0, animated: true });
+      scrollToDay: (date: Date) => {
+        ignoreScrollUntil.current = Date.now() + 400;
+        const hourIdx = (date.getTime() - startEpoch) / 3600000;
+        const x = Math.max(0, (hourIdx - CURSOR_H_OFFSET) * PPH);
+        scrollRef.current?.scrollTo({ x, animated: true });
       },
     }));
 
     const handleScroll = (scrollX: number) => {
       if (Date.now() < ignoreScrollUntil.current) return;
-      const contentX = scrollX + cursorX;
-      const offsetFromCursor = contentX / PPH - cursorHourOffset;
-      const snapped = Math.round(offsetFromCursor * 2) / 2;
-      onOffsetChange?.(snapped);
+      const hourIndex = (scrollX + cursorX) / PPH;
+      const snapped = Math.round(hourIndex * 2) / 2;
+      onScrollHour?.(snapped);
     };
 
-    // Courbe de marée
+    const handleScrollSettled = (scrollX: number) => {
+      if (Date.now() < ignoreScrollUntil.current) return;
+      const hourIndex = (scrollX + cursorX) / PPH;
+      const d = new Date(startEpoch + hourIndex * 3600000);
+      const day = new Date(d); day.setHours(0, 0, 0, 0);
+      onDayChange?.(day);
+      onScrollHour?.(null);
+    };
+
+    // Tide curve
     const hasTide = tideHeights && tideHeights.some(h => h > 0);
     let tidePath = '';
     if (hasTide && tideHeights) {
@@ -78,11 +90,17 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
       tidePath = 'M ' + pts.join(' L ');
     }
 
-    // Repères toutes les 6h
+    // Build tick labels (6h) and day separators (midnight)
     const ticks: { i: number; label: string }[] = [];
+    const daySeps: { i: number; label: string }[] = [];
     for (let i = 0; i <= totalHours; i += 6) {
       const d = new Date(startEpoch + i * 3600000);
-      ticks.push({ i, label: `${String(d.getHours()).padStart(2, '0')}h` });
+      if (i > 0 && d.getHours() === 0) {
+        const raw = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+        daySeps.push({ i, label: raw.charAt(0).toUpperCase() + raw.slice(1) });
+      } else {
+        ticks.push({ i, label: `${String(d.getHours()).padStart(2, '0')}h` });
+      }
     }
 
     return (
@@ -91,11 +109,20 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
           ref={scrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
+          contentOffset={{ x: initialScrollX, y: 0 }}
           onScroll={e => handleScroll(e.nativeEvent.contentOffset.x)}
           scrollEventThrottle={16}
+          onScrollEndDrag={e => {
+            clearTimeout(scrollEndTimer.current);
+            const x = e.nativeEvent.contentOffset.x;
+            scrollEndTimer.current = setTimeout(() => handleScrollSettled(x), 50);
+          }}
+          onMomentumScrollEnd={e => {
+            clearTimeout(scrollEndTimer.current);
+            handleScrollSettled(e.nativeEvent.contentOffset.x);
+          }}
           contentContainerStyle={{ width: contentWidth }}
         >
-          {/* Contenu scrollable : barres + marée + repères */}
           <View style={{ width: contentWidth, height: SVG_H + TICK_H }}>
             <Svg width={contentWidth} height={SVG_H}>
               <Defs>
@@ -121,6 +148,17 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
                   strokeLinejoin="round"
                 />
               )}
+              {/* Day separators */}
+              {daySeps.map(sep => (
+                <Line
+                  key={sep.i}
+                  x1={sep.i * PPH} y1={0}
+                  x2={sep.i * PPH} y2={SVG_H}
+                  stroke="rgba(255,255,255,0.4)"
+                  strokeWidth={1.5}
+                />
+              ))}
+              {/* Hour tick marks */}
               {ticks.map(t => (
                 <Line
                   key={t.i}
@@ -130,20 +168,30 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
                   strokeWidth={1}
                 />
               ))}
+              {/* Now marker: white stripe on top of the current hour bar */}
+              <Rect
+                x={nowIndex * PPH + 1} y={0}
+                width={PPH - 2} height={4}
+                fill="rgba(255,255,255,0.75)"
+                rx={2}
+              />
             </Svg>
-            {/* Labels des repères */}
+            {/* Hour labels */}
             {ticks.map(t => (
-              <View
-                key={t.i}
-                style={[styles.tickWrap, { left: t.i * PPH - 14 }]}
-              >
+              <View key={t.i} style={[styles.tickWrap, { left: t.i * PPH - 14 }]}>
                 <Text style={styles.tick}>{t.label}</Text>
+              </View>
+            ))}
+            {/* Day separator labels */}
+            {daySeps.map(sep => (
+              <View key={sep.i} style={[styles.dayWrap, { left: sep.i * PPH + 4 }]}>
+                <Text style={styles.dayLbl}>{sep.label}</Text>
               </View>
             ))}
           </View>
         </ScrollView>
 
-        {/* Curseur fixe */}
+        {/* Fixed cursor */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           <View style={[styles.cursorLine, { left: cursorX - 1 }]} />
           <View style={[styles.cursorCircle, { left: cursorX - 8, top: SVG_H / 2 - 8 }]} />
@@ -173,6 +221,16 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: FONTS.mono,
     color: 'rgba(255,255,255,0.55)',
+  },
+  dayWrap: {
+    position: 'absolute',
+    top: SVG_H + 4,
+    alignItems: 'flex-start',
+  },
+  dayLbl: {
+    fontSize: 10,
+    fontFamily: FONTS.semiBold,
+    color: 'rgba(255,255,255,0.8)',
   },
   cursorLine: {
     position: 'absolute',

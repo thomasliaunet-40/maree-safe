@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Platform,
 } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText, G } from 'react-native-svg';
-import { WeatherData, HourlyWeather, BoatSettings, Port } from '../types';
+import { WeatherData, HourlyWeather, BoatSettings, Port, VerdictLevel } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import { degreesToCompass, beaufortScale } from '../utils/windDirection';
@@ -11,10 +11,14 @@ import { Screen } from '../components/FabNav';
 import Icon from '../components/Icon';
 import Compass from '../components/Compass';
 import AppLogo from '../components/AppLogo';
+import DateStrip from '../components/DateStrip';
 
 interface Props {
   weatherData: WeatherData | null;
   selectedDate: Date;
+  maxDate: Date;
+  dayVerdicts: Record<string, VerdictLevel>;
+  onSelectDate: (date: Date) => void;
   port: Port;
   boat: BoatSettings;
   onNav: (s: Screen) => void;
@@ -78,7 +82,7 @@ const DIR_Y = 90;
 const HOUR_Y = 103;
 const SVG_H = 110;
 
-export default function WindScreen({ weatherData, selectedDate, port, boat, onNav }: Props) {
+export default function WindScreen({ weatherData, selectedDate, maxDate, dayVerdicts, onSelectDate, port, boat, onNav }: Props) {
   const warnWind = boat.warnWind ?? 15;
   const maxWind = boat.maxWind ?? 25;
 
@@ -159,6 +163,8 @@ export default function WindScreen({ weatherData, selectedDate, port, boat, onNa
         </View>
         <AppLogo height={28} />
       </View>
+
+      <DateStrip selectedDate={selectedDate} maxDate={maxDate} verdicts={dayVerdicts} onSelect={onSelectDate} />
 
       <ScrollView
         style={styles.scroll}

@@ -3,15 +3,19 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, PanResponder, LayoutChangeEvent,
 } from 'react-native';
 import Svg, { Path, Circle, Line, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { TideData, TidePoint } from '../types';
+import { TideData, TidePoint, VerdictLevel } from '../types';
 import { COLORS } from '../constants/colors';
 import { FONTS } from '../constants/fonts';
 import Icon from '../components/Icon';
 import NavFade, { Screen } from '../components/NavFade';
+import DateStrip from '../components/DateStrip';
 
 interface Props {
   tideData: TideData | null;
   selectedDate: Date;
+  maxDate: Date;
+  dayVerdicts: Record<string, VerdictLevel>;
+  onSelectDate: (date: Date) => void;
   onNav: (s: Screen) => void;
 }
 
@@ -33,7 +37,7 @@ function interpolateHeight(points: TidePoint[], hour: number): number {
   return ordered[ordered.length - 1]?.height ?? 0;
 }
 
-export default function TideScreen({ tideData, selectedDate, onNav }: Props) {
+export default function TideScreen({ tideData, selectedDate, maxDate, dayVerdicts, onSelectDate, onNav }: Props) {
   const [scrubHour, setScrubHour] = useState(new Date().getHours() + new Date().getMinutes() / 60);
   const [svgWidth, setSvgWidth] = useState(320);
   const SVG_H = 200;
@@ -102,6 +106,8 @@ export default function TideScreen({ tideData, selectedDate, onNav }: Props) {
         <Text style={styles.topTitle}>Marée du jour</Text>
         <View style={{ width: 32 }} />
       </View>
+
+      <DateStrip selectedDate={selectedDate} maxDate={maxDate} verdicts={dayVerdicts} onSelect={onSelectDate} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <Text style={styles.heading}>Hauteur d'eau</Text>

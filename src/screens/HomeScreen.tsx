@@ -23,6 +23,7 @@ interface Props {
   selectedDate: Date;
   maxDate: Date;
   isToday: boolean;
+  dayVerdicts: Record<string, VerdictLevel>;
   onNav: (s: Screen) => void;
   onRefresh: () => void;
   onSelectDate: (date: Date) => void;
@@ -87,15 +88,6 @@ function levelColor(level: 'green' | 'orange' | 'red') {
   return                         { bg: COLORS.stop,  ink: '#fff' };
 }
 
-function findHourlyWeather(hourly: HourlyWeather[], hour: number, date: Date): HourlyWeather | null {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  const prefix = `${y}-${m}-${d}T${String(hour).padStart(2, '0')}`;
-  return hourly.find(h => h.time.startsWith(prefix)) ?? null;
-}
-
-
 function findTideHeightAtMs(points: TideData['points'], ms: number): number | null {
   let best: number | null = null;
   let bestDiff = Infinity;
@@ -106,7 +98,6 @@ function findTideHeightAtMs(points: TideData['points'], ms: number): number | nu
   return best;
 }
 
-// Calcule scores + hauteurs marée sur une fenêtre de N heures à partir d'un timestamp
 function buildTimelineData(
   startMs: number,
   totalHours: number,
@@ -149,87 +140,95 @@ function buildTimelineData(
   return { scores, tideHeights };
 }
 
-const PAST_HOURS = 2;
-const FUTURE_HOURS = 9 * 24;
-const TOTAL_HOURS = PAST_HOURS + FUTURE_HOURS;
+const TOTAL_HOURS = 9 * 24; // 216h — 9 jours depuis minuit
+
+function isSameDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear()
+    && a.getMonth() === b.getMonth()
+    && a.getDate() === b.getDate();
+}
 
 export default function HomeScreen({
   port, tideData, weatherData, verdict, loading, tideError, weatherError,
-  boat, selectedDate, maxDate, isToday, onNav, onRefresh, onSelectDate,
+  boat, selectedDate, maxDate, isToday, dayVerdicts, onNav, onRefresh, onSelectDate,
 }: Props) {
   const nowRef = useRef(new Date());
   const now = nowRef.current;
   const hour = now.getHours();
 
   const timelineRef = useRef<VerdictTimelineHandle>(null);
-  // scrubOffset : décalage en heures depuis "maintenant" (null = maintenant)
-  const [scrubOffset, setScrubOffset] = useState<number | null>(null);
+  const [scrubHourIndex, setScrubHourIndex] = useState<number | null>(null);
+  const isFirstRender = useRef(true);
+  const pendingScrollTo = useRef<Date | null>(null);
 
+  // startEpoch = midnight of today; nowIndex = current hour
+  const startEpoch = useMemo(() => {
+    const m = new Date(now); m.setHours(0, 0, 0, 0); return m.getTime();
+  }, []);
+  const nowIndex = hour;
+
+  // When chip tapped: record intended scroll target, then delegate up
+  const handleChipSelect = (date: Date) => {
+    const todayMidnight = new Date(); todayMidnight.setHours(0, 0, 0, 0);
+    pendingScrollTo.current = isSameDay(date, todayMidnight) ? nowRef.current : date;
+    onSelectDate(date);
+  };
+
+  // When selectedDate changes: scroll if chip-initiated, skip if scroll-initiated
   useEffect(() => {
-    setScrubOffset(null);
-    timelineRef.current?.scrollToNow();
+    setScrubHourIndex(null);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return; // contentOffset handles initial position
+    }
+    if (pendingScrollTo.current) {
+      timelineRef.current?.scrollToDay(pendingScrollTo.current);
+      pendingScrollTo.current = null;
+    }
   }, [selectedDate]);
 
-  // Timestamp de début de la fenêtre timeline (-2h)
-  const startEpoch = useMemo(() => now.getTime() - PAST_HOURS * 3600000, []);
-
-  // Données 50h calculées depuis weatherData
-  const { scores: scores50h, tideHeights: tideH50 } = useMemo(() => {
+  // 216h data from midnight today
+  const { scores: scores216, tideHeights: tideH216 } = useMemo(() => {
     if (!weatherData) return { scores: Array(TOTAL_HOURS).fill(50), tideHeights: Array(TOTAL_HOURS).fill(0) };
     return buildTimelineData(startEpoch, TOTAL_HOURS, weatherData, tideData, boat);
   }, [weatherData, tideData, boat]);
 
-  // Hauteurs marée heure par heure pour les dates non-aujourd'hui
-  const tideH24ForDate = useMemo(() => {
-    if (isToday || !tideData) return undefined;
-    const base = new Date(selectedDate);
-    base.setHours(0, 0, 0, 0);
-    return Array.from({ length: 24 }, (_, i) => {
-      const d = new Date(base.getTime() + i * 3600000);
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const prefix = `${y}-${m}-${dd}T${String(i).padStart(2, '0')}`;
-      return tideData.points.find(p => p.time.startsWith(prefix))?.height ?? 0;
-    });
-  }, [isToday, tideData, selectedDate]);
-
-  // Heure/date affichée selon le scrub
-  const displayMs = (() => {
-    if (scrubOffset === null) return now.getTime();
-    if (isToday) return now.getTime() + scrubOffset * 3600000;
-    const base = new Date(selectedDate); base.setHours(0, 0, 0, 0);
-    return base.getTime() + (PAST_HOURS + scrubOffset) * 3600000;
-  })();
+  // Display time: scrub position or now
+  const displayMs = scrubHourIndex !== null
+    ? startEpoch + scrubHourIndex * 3600000
+    : now.getTime();
   const displayDate = new Date(displayMs);
   const displayHourInt = displayDate.getHours();
 
-  // Données météo et marée à l'heure affichée (calculées avant le niveau pour en dépendre)
   const hourlyW = weatherData
     ? (() => {
-        const w = weatherData.hourly.find(h => {
-          const y = displayDate.getFullYear();
-          const m = String(displayDate.getMonth() + 1).padStart(2, '0');
-          const d = String(displayDate.getDate()).padStart(2, '0');
-          const prefix = `${y}-${m}-${d}T${String(displayHourInt).padStart(2, '0')}`;
-          return h.time.startsWith(prefix);
-        });
-        return w ?? null;
+        const y = displayDate.getFullYear();
+        const m = String(displayDate.getMonth() + 1).padStart(2, '0');
+        const d = String(displayDate.getDate()).padStart(2, '0');
+        const prefix = `${y}-${m}-${d}T${String(displayHourInt).padStart(2, '0')}`;
+        return weatherData.hourly.find(h => h.time.startsWith(prefix)) ?? null;
       })()
     : null;
+
   const displayWind  = hourlyW?.windSpeed  ?? weatherData?.windSpeed  ?? 0;
   const displayGust  = hourlyW?.windGust   ?? weatherData?.windGust   ?? 0;
   const displayWaveH = hourlyW?.waveHeight ?? weatherData?.waveHeight ?? 0;
-  const displayTideH = tideData ? (() => {
-    if (scrubOffset !== null) return findTideHeightAtMs(tideData.points, displayMs) ?? tideData.currentHeight;
-    if (isToday) return tideData.currentHeight;
-    return findTideHeightAtMs(tideData.points, new Date(selectedDate).setHours(hour, 0, 0, 0)) ?? 0;
-  })() : 0;
+  const displayTideH = tideData
+    ? (scrubHourIndex !== null
+        ? findTideHeightAtMs(tideData.points, displayMs) ?? tideData.currentHeight
+        : isToday
+          ? tideData.currentHeight
+          : findTideHeightAtMs(tideData.points, new Date(selectedDate).setHours(hour, 0, 0, 0)) ?? 0)
+    : 0;
 
   const displayLevel = assessLevel(displayWind, displayGust, displayWaveH, boat, displayTideH > 0 ? displayTideH : undefined);
   const { bg, ink } = levelColor(displayLevel);
+  const isScrubbing = scrubHourIndex !== null;
 
-  const isScrubbing = scrubOffset !== null;
+  const dateFmt = selectedDate.toLocaleDateString('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  });
+  const dateLabel = dateFmt.charAt(0).toUpperCase() + dateFmt.slice(1);
 
   const nextTide = (() => {
     if (!tideData) return null;
@@ -240,30 +239,16 @@ export default function HomeScreen({
     }) ?? tideData.peaks[0] ?? null;
   })();
 
-  // Verdict dominant par jour pour les chips
-  const dayVerdicts = useMemo(() => {
-    if (!weatherData) return {};
-    const result: Record<string, VerdictLevel> = {};
-    for (let i = 0; i < 9; i++) {
-      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const hours = weatherData.hourly.filter(h => h.time.startsWith(key));
-      if (!hours.length) continue;
-      let level: VerdictLevel = 'green';
-      for (const h of hours) level = worstLevel(level, assessWeatherLevel(h.windSpeed, h.windGust, h.waveHeight, boat));
-      result[key] = level;
+  const verdictTimeLabel = (() => {
+    if (isScrubbing) {
+      const mins = displayDate.getMinutes() >= 30 ? '30' : '00';
+      const timeStr = `${String(displayHourInt).padStart(2, '0')}h${mins}`;
+      const sameDay = displayDate.getDate() === now.getDate() && displayDate.getMonth() === now.getMonth();
+      const prefix = sameDay ? 'Auj.' : displayDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+      return `${prefix} - ${timeStr}`;
     }
-    return result;
-  }, [weatherData, boat]);
-
-  const dateFmt = selectedDate.toLocaleDateString('fr-FR', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
-  const dateLabel = dateFmt.charAt(0).toUpperCase() + dateFmt.slice(1);
-
-  const displayDateLabel = (() => {
-    const fmt = displayDate.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-    return fmt.charAt(0).toUpperCase() + fmt.slice(1);
+    if (isToday) return `Maintenant · ${String(hour).padStart(2, '0')}h00`;
+    return dateLabel;
   })();
 
   return (
@@ -282,7 +267,7 @@ export default function HomeScreen({
           selectedDate={isScrubbing ? displayDate : selectedDate}
           maxDate={maxDate}
           verdicts={dayVerdicts}
-          onSelect={onSelectDate}
+          onSelect={handleChipSelect}
         />
       </View>
 
@@ -304,45 +289,38 @@ export default function HomeScreen({
             {/* Verdict card */}
             <View style={[styles.verdictCard, { backgroundColor: bg }]}>
               <TouchableOpacity
-                onPress={() => { setScrubOffset(null); timelineRef.current?.scrollToNow(); }}
+                onPress={() => {
+                  setScrubHourIndex(null);
+                  pendingScrollTo.current = nowRef.current;
+                  onSelectDate(new Date(startEpoch)); // reset to today
+                  timelineRef.current?.scrollToDay(nowRef.current);
+                }}
                 activeOpacity={isScrubbing ? 0.6 : 1}
               >
-                <Text style={[styles.verdictTime, { color: ink }]}>
-                  {isScrubbing ? (() => {
-                    const mins = displayDate.getMinutes() >= 30 ? '30' : '00';
-                    const timeStr = `${String(displayHourInt).padStart(2, '0')}h${mins}`;
-                    const sameDay = displayDate.getDate() === now.getDate() && displayDate.getMonth() === now.getMonth();
-                    const prefix = sameDay ? 'Auj.' : displayDate.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
-                    return `${prefix} - ${timeStr}`;
-                  })() : isToday
-                    ? `Maintenant · ${String(hour).padStart(2, '0')}h00`
-                    : dateLabel}
-                </Text>
+                <Text style={[styles.verdictTime, { color: ink }]}>{verdictTimeLabel}</Text>
               </TouchableOpacity>
               <Text style={[styles.verdictTitle, { color: ink }]} numberOfLines={1}>
                 Conditions de navigation
               </Text>
 
-              {/* Timeline */}
+              {/* Timeline 9j continue */}
               <View style={{ marginTop: 20 }}>
                 <VerdictTimeline
                   ref={timelineRef}
-                  scores={isToday ? scores50h : verdict.hourlyScores}
-                  tideHeights={isToday ? tideH50 : tideH24ForDate}
-                  startEpoch={isToday ? startEpoch : new Date(selectedDate).setHours(0, 0, 0, 0)}
-                  cursorHourOffset={PAST_HOURS}
-                  initialScrollX={isToday ? 0 : Math.max(0, (Math.min(hour, 22) - PAST_HOURS) * 42)}
-                  onOffsetChange={setScrubOffset}
+                  scores={scores216}
+                  tideHeights={tideH216}
+                  startEpoch={startEpoch}
+                  nowIndex={nowIndex}
+                  onScrollHour={setScrubHourIndex}
+                  onDayChange={day => { onSelectDate(day); }}
                 />
               </View>
 
-              {/* Coefficient de l'étale suivante */}
               {tideData?.coefficient != null && (
                 <Text style={[styles.coefLine, { color: ink }]}>
                   COEFF : {tideData.coefficient}
                 </Text>
               )}
-
             </View>
 
             {/* Conditions vs seuils */}
@@ -367,8 +345,6 @@ export default function HomeScreen({
               );
             })()}
 
-            {/* Action cards */}
-{/* Erreurs */}
             {tideError && <Text style={styles.error}>{tideError}</Text>}
             {weatherError && <Text style={styles.error}>{weatherError}</Text>}
           </>
@@ -390,27 +366,18 @@ const styles = StyleSheet.create({
   scroll:        { flex: 1 },
   scrollContent: { padding: 18, paddingBottom: 120 },
 
-  greeting:     { paddingHorizontal: 4, paddingBottom: 18 },
-  greetingDate: { fontSize: 12, fontFamily: FONTS.medium, color: COLORS.ink3, textTransform: 'uppercase', letterSpacing: 1 },
-  greetingTitle:{ fontSize: 34, fontFamily: FONTS.display, letterSpacing: -0.5, marginTop: 6, color: COLORS.ink, lineHeight: 40 },
-  greetingMuted:{ color: COLORS.ink3 },
-
   loading:     { alignItems: 'center', paddingVertical: 60, gap: 12 },
   loadingText: { fontSize: 14, fontFamily: FONTS.regular, color: COLORS.ink3 },
 
-  // Verdict
   verdictCard:  { borderRadius: 28, paddingTop: 28, paddingHorizontal: 24, paddingBottom: 24, marginBottom: 14 },
   verdictTime:  { fontSize: 20, fontFamily: FONTS.display, letterSpacing: -0.3, opacity: 0.85, marginBottom: 10, textAlign: 'center' },
   verdictTitle: { fontSize: 30, fontFamily: FONTS.display, lineHeight: 34, textAlign: 'center' },
   coefLine:     { fontSize: 26, fontFamily: FONTS.mono, fontWeight: '700', letterSpacing: 0.06, opacity: 0.75, marginTop: 8, textAlign: 'center' },
 
-  // Conditions card
   condCard:   { backgroundColor: COLORS.paper, borderRadius: 28, padding: 20, marginBottom: 14, borderWidth: 1, borderColor: COLORS.hairline },
   condHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   condTitle:  { fontSize: 15, fontFamily: FONTS.semiBold, color: COLORS.ink },
   condRows:   { gap: 8 },
-
-  // Action cards
 
   error: { fontSize: 13, fontFamily: FONTS.regular, color: COLORS.stop, marginTop: 8, textAlign: 'center' },
 });

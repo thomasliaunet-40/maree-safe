@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import { Port, TideData, WeatherData, VerdictResult, BoatSettings, BOAT_DEFAULT } from '../types';
+import { Port, TideData, WeatherData, VerdictResult, BoatSettings, BOAT_DEFAULT, VerdictLevel } from '../types';
 import { COLORS } from '../constants/colors';
 import { ALL_PORTS } from '../constants/ports';
 import { fetchTideData } from '../services/tideService';
@@ -8,7 +8,7 @@ import { fetchWeatherData } from '../services/weatherService';
 import { saveApiKey, loadApiKey, saveSelectedPortId, loadSelectedPortId } from '../services/storageService';
 import { getLastAvailableDate } from '../services/remoteTideService';
 import { saveBoatProfiles, loadBoatProfiles, saveActiveBoatIndex, loadActiveBoatIndex } from '../services/boatService';
-import { calculateVerdict } from '../utils/verdictCalculator';
+import { calculateVerdict, assessWeatherLevel, worstLevel } from '../utils/verdictCalculator';
 import { Screen } from '../components/FabNav';
 
 import HomeScreen from '../screens/HomeScreen';
@@ -66,7 +66,7 @@ export default function AppNavigator() {
     setWeatherError(null);
 
     const [tideRes, weatherRes] = await Promise.allSettled([
-      fetchTideData(p, key, date, 2),
+      fetchTideData(p, key, date, 8),
       fetchWeatherData(p),
     ]);
 
@@ -93,7 +93,7 @@ export default function AppNavigator() {
 
   useEffect(() => {
     if (initialized) loadData(port, apiKey, selectedDate, activeBoat);
-  }, [initialized, port, selectedDate]);
+  }, [initialized, port]);
 
   useEffect(() => {
     getLastAvailableDate(port.id).then(lastTide => {
@@ -134,8 +134,22 @@ export default function AppNavigator() {
   const handleSelectDate = (d: Date) => {
     const nd = new Date(d); nd.setHours(0, 0, 0, 0);
     setSelectedDate(nd);
-    setScreen('home');
   };
+
+  const dayVerdicts = useMemo(() => {
+    if (!weatherData) return {} as Record<string, VerdictLevel>;
+    const result: Record<string, VerdictLevel> = {};
+    for (let i = 0; i < 9; i++) {
+      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + i);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const hours = weatherData.hourly.filter(h => h.time.startsWith(key));
+      if (!hours.length) continue;
+      let level: VerdictLevel = 'green';
+      for (const h of hours) level = worstLevel(level, assessWeatherLevel(h.windSpeed, h.windGust, h.waveHeight, activeBoat));
+      result[key] = level;
+    }
+    return result;
+  }, [weatherData, activeBoat]);
 
   // Bouton retour Android : home d'abord, puis quitter
   useEffect(() => {
@@ -164,6 +178,7 @@ export default function AppNavigator() {
           selectedDate={selectedDate}
           maxDate={maxAvailableDate}
           isToday={isToday}
+          dayVerdicts={dayVerdicts}
           onSelectDate={handleSelectDate}
           onRefresh={() => loadData(port, apiKey, selectedDate, activeBoat)}
           {...commonProps}
@@ -180,6 +195,9 @@ export default function AppNavigator() {
         <TideScreen
           tideData={tideData}
           selectedDate={selectedDate}
+          maxDate={maxAvailableDate}
+          dayVerdicts={dayVerdicts}
+          onSelectDate={handleSelectDate}
           {...commonProps}
         />
       )}
@@ -197,6 +215,9 @@ export default function AppNavigator() {
         <WindScreen
           weatherData={weatherData}
           selectedDate={selectedDate}
+          maxDate={maxAvailableDate}
+          dayVerdicts={dayVerdicts}
+          onSelectDate={handleSelectDate}
           port={port}
           boat={activeBoat}
           {...commonProps}
