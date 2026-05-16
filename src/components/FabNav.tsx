@@ -3,10 +3,11 @@ import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from './Icon';
 import { COLORS } from '../constants/colors';
 
-export type Screen = 'home' | 'ports' | 'tide' | 'boat';
+export type Screen = 'home' | 'ports' | 'tide' | 'boat' | 'wind';
 
 const ITEMS: { id: Screen; icon: React.ComponentProps<typeof Icon>['name'] }[] = [
   { id: 'home',  icon: 'home' },
+  { id: 'wind',  icon: 'wind' },
   { id: 'tide',  icon: 'wave' },
   { id: 'boat',  icon: 'settings' },
 ];

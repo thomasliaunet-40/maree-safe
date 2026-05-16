@@ -15,6 +15,7 @@ import HomeScreen from '../screens/HomeScreen';
 import PortsScreen from '../screens/PortsScreen';
 import TideScreen from '../screens/TideScreen';
 import BoatScreen from '../screens/BoatScreen';
+import WindScreen from '../screens/WindScreen';
 import ApiKeyModal from '../components/ApiKeyModal';
 
 const DEFAULT_PORT = ALL_PORTS.find(p => p.id === 'boucau-bayonne-biarritz') ?? ALL_PORTS[0];
@@ -188,6 +189,16 @@ export default function AppNavigator() {
           activeIndex={activeBoatIndex}
           onBoatsChange={handleBoatsChange}
           onActiveIndexChange={handleActiveIndexChange}
+          {...commonProps}
+        />
+      )}
+
+      {screen === 'wind' && weatherData && (
+        <WindScreen
+          weatherData={weatherData}
+          selectedDate={selectedDate}
+          port={port}
+          boat={activeBoat}
           {...commonProps}
         />
       )}
