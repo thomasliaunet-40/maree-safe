@@ -1,6 +1,6 @@
 import React, { useRef, forwardRef, useImperativeHandle } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import Svg, { Rect, Path, Line, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Svg, { Rect, Path, Line } from 'react-native-svg';
 import { FONTS } from '../constants/fonts';
 import { COLORS } from '../constants/colors';
 
@@ -125,19 +125,9 @@ const VerdictTimeline = forwardRef<VerdictTimelineHandle, Props>(
         >
           <View style={{ width: contentWidth, height: SVG_H + TICK_H }}>
             <Svg width={contentWidth} height={SVG_H}>
-              <Defs>
-                <LinearGradient id="grad" x1="0" y1="0" x2="1" y2="0">
-                  {scores.map((score, i) => (
-                    <Stop
-                      key={i}
-                      offset={`${((i + 0.5) / totalHours * 100).toFixed(2)}%`}
-                      stopColor={scoreToColor(score)}
-                      stopOpacity={1}
-                    />
-                  ))}
-                </LinearGradient>
-              </Defs>
-              <Rect x={0} y={0} width={contentWidth} height={SVG_H} fill="url(#grad)" />
+              {scores.map((score, i) => (
+                <Rect key={i} x={i * PPH} y={0} width={PPH} height={SVG_H} fill={scoreToColor(score)} />
+              ))}
               {hasTide && (
                 <Path
                   d={tidePath}
